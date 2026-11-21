@@ -3,9 +3,7 @@
   "name": "JVAmpel",
   "type": 3,
   "vendor": "JV",
-  "aliases": [
-    "JV Garagentor Ampelsteuerung"
-  ],
+  "aliases": ["JV Garagentor Ampelsteuerung"],
   "url": "https://github.com/johannes-veit/JVGaragentor",
   "parentRequirements": [],
   "childRequirements": [],

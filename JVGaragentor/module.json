@@ -3,10 +3,7 @@
   "name": "JVGaragentor",
   "type": 3,
   "vendor": "JV",
-  "aliases": [
-    "JV Garagentor",
-    "Glasfassaden-Garagentor"
-  ],
+  "aliases": ["JV Garagentor", "Glasfassaden-Garagentor"],
   "url": "https://github.com/johannes-veit/JVGaragentor",
   "parentRequirements": [],
   "childRequirements": [],

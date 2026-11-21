@@ -130,6 +130,7 @@ $html=$gate->GetVisualizationTile();
 check(str_contains($html,'data-jvg-command="AUF"')&&str_contains($html,'GESTOPPT'),'HTML-Kachel erzeugt');
 check(!str_contains($html,'__JV_INITIAL__'),'HTML-Initialzustand eingefügt');
 check(str_contains($html,'"enabled":false'),'HTML-Kachel gesperrt');
+check(str_contains($html, "b.dataset.jvgCommand === 'STOP'"), 'STOP-Taste bleibt bei Timeout-Sperre getrennt bedienbar');
 $ampel=new JVAmpel();$ampel->Create();$ampel->ApplyChanges();
 check($ampel->values['AmpelStatus']==='Automatik AUS','Ampel standardmäßig gesperrt');
 // Assign a simulated Symcon 'Position' variable, not the module-owned value container.

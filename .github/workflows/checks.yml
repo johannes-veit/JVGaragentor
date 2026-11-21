@@ -20,5 +20,16 @@ jobs:
           python3 -m json.tool JVGaragentor/form.json >/dev/null
           python3 -m json.tool JVAmpel/module.json >/dev/null
           python3 -m json.tool JVAmpel/form.json >/dev/null
+      - name: JavaScript Syntax der HTML-Kachel
+        run: |
+          python3 - <<'PYJS'
+          import re
+          from pathlib import Path
+          html=Path('JVGaragentor/module.html').read_text(encoding='utf-8')
+          scripts=re.findall(r'<script>(.*?)</script>', html, flags=re.S)
+          assert len(scripts)==1
+          Path('/tmp/jvg-tile.js').write_text(scripts[0], encoding='utf-8')
+          PYJS
+          node --check /tmp/jvg-tile.js
       - name: Simulierte Statuswechsel und Kommandos
         run: php tests/simulate.php

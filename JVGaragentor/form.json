@@ -12,17 +12,22 @@
     {
       "type": "SelectVariable",
       "name": "RelayOpenVariable",
-      "caption": "Shelly Pro 3 – Relais AUF (Boolean, Impuls EIN)"
+      "caption": "Shelly Ausgang 1 (O1) – Status / AUF – ID 44228"
     },
     {
       "type": "SelectVariable",
       "name": "RelayCloseVariable",
-      "caption": "Shelly Pro 3 – Relais ZU (Boolean, Impuls EIN)"
+      "caption": "Shelly Ausgang 2 (O2) – Status 1 / ZU – ID 56652"
     },
     {
       "type": "SelectVariable",
       "name": "RelayStopVariable",
-      "caption": "Shelly Pro 3 – Relais STOP (Boolean, Impuls AUS)"
+      "caption": "Shelly Ausgang 3 (O3) – Status 2 / STOP – ID 55944"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "RelayOnlineVariable",
+      "caption": "Shelly erreichbar – ID 17585"
     },
     {
       "type": "SelectVariable",
@@ -51,6 +56,10 @@
     {
       "type": "Label",
       "caption": "Die Endlagenvariablen müssen bei erreichter Endlage TRUE liefern. Bei abgelaufener Zeit ohne Endlagenmeldung erscheint GESTOPPT; das beweist keinen Stillstand."
+    },
+    {
+      "type": "Label",
+      "caption": "Achtung: Die Relais-Ausgänge sind noch nicht an der CS320 angeschlossen. Die Bedienung bleibt standardmäßig deaktiviert."
     }
   ],
   "actions": []

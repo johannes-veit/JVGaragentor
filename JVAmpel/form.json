@@ -1,13 +1,37 @@
 {
   "elements": [
-    {"type":"Label","caption":"JV Ampel v1.0 – völlig unabhängige WLED-Steuerung. Nur WLED Garage vorne wird geschaltet; hinten folgt über WLED-Sync."},
-    {"type":"CheckBox","name":"EnableAmpel","caption":"Ampelautomatik aktivieren (nach Prüfung beider LED-Seiten)"},
-    {"type":"SelectVariable","name":"PositionVariable","caption":"JVGaragentor: Position (Stringvariable aus Tor-Modul)"},
-    {"type":"SelectVariable","name":"PresetVariable","caption":"WLED Garage vorne: Voreinstellungen – ID 46199"},
-    {"type":"SelectVariable","name":"PowerVariable","caption":"WLED Garage vorne: Ein – ID 29605"},
-    {"type":"CheckBox","name":"SwitchOffWhenStopped","caption":"Bei GESTOPPT Ampel AUS (keine falsche Endlagen- oder Fahranzeige)"},
-    {"type":"Label","caption":"Presets: 1 Gelb pulsierend = LÄUFT AUF; 2 Grün = AUF; 3 Rot pulsierend = LÄUFT ZU; 4 Rot dauerhaft = ZU. Werte 0 und 5 derzeit nicht nutzen."},
-    {"type":"Label","caption":"STOP / Zwischenposition: WLED aus (konfigurierbar). Ampel ist nur eine Anzeige und ersetzt keine CS320-Sicherheitseinrichtungen."}
+    {
+      "type": "Label",
+      "caption": "JV Ampel v1.1 – unabhängig von der Toransteuerung. Schaltet nur WLED vorne; hinten übernimmt WLED-Synchronisierung."
+    },
+    {
+      "type": "CheckBox",
+      "name": "EnableAmpel",
+      "caption": "Ampelautomatik aktivieren (nach Prüfung beider LED-Seiten)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "SignalVariable",
+      "caption": "JVGaragentor: Ampel-Signal (Integer 0–4 aus Tor-Modul)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "PresetVariable",
+      "caption": "WLED Garage vorne: Voreinstellungen – ID 46199"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "PowerVariable",
+      "caption": "WLED Garage vorne: Ein – ID 29605"
+    },
+    {
+      "type": "Label",
+      "caption": "Ampel-Signal 1 -> WLED Preset 1 Gelb pulsierend; 2 -> Preset 2 Grün; 3 -> Preset 3 Rot pulsierend; 4 -> Preset 4 Rot statisch. Signal 0 -> WLED AUS."
+    },
+    {
+      "type": "Label",
+      "caption": "Alle Zeiten bestimmt JVGaragentor. JVAmpel folgt nur einem numerischen Signal und verschickt niemals Torbefehle."
+    }
   ],
   "actions": []
 }

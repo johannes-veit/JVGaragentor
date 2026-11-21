@@ -1,19 +1,92 @@
 {
   "elements": [
-    {"type":"Label","caption":"JV Garagentor v1.0 – Shelly-Ausgänge nur bei geprüfter Verdrahtung freigeben. Getrennt von der WLED-Ampel."},
-    {"type":"CheckBox","name":"EnableControl","caption":"Toransteuerung freigeben (erst nach CS320- und Relais-Test)"},
-    {"type":"SelectVariable","name":"RelayOpenVariable","caption":"Shelly AUF – O1, Status, ID 44228"},
-    {"type":"SelectVariable","name":"RelayCloseVariable","caption":"Shelly ZU – O2, Status 1, ID 56652"},
-    {"type":"SelectVariable","name":"RelayStopVariable","caption":"Shelly STOP – O3, Status 2, ID 55944"},
-    {"type":"SelectVariable","name":"OnlineVariable","caption":"Shelly Erreichbar – ID 17585"},
-    {"type":"SelectVariable","name":"EndOpenVariable","caption":"Endlage AUF (Boolean, TRUE bei Endlage; noch zu verdrahten)"},
-    {"type":"SelectVariable","name":"EndCloseVariable","caption":"Endlage ZU (Boolean, TRUE bei Endlage; noch zu verdrahten)"},
-    {"type":"CheckBox","name":"RequireEndStops","caption":"Fahrbefehle ohne beide Endlagenrückmeldungen sperren (empfohlen)"},
-    {"type":"NumberSpinner","name":"TravelSeconds","caption":"Maximale vollständige Laufzeit in Sekunden (Platzhalter 60)","minimum":5,"maximum":300},
-    {"type":"NumberSpinner","name":"ReserveSeconds","caption":"Reserve nach Laufzeit in Sekunden","minimum":1,"maximum":120},
-    {"type":"NumberSpinner","name":"PulseToleranceSeconds","caption":"Prüfung Rückfall der Shelly-Impulse nach Sekunden","minimum":2,"maximum":15},
-    {"type":"Label","caption":"Wichtig: Der Shelly Pro 3 muss selbständig O1/O2 nach 1 s AUS und O3 nach 1 s EIN schalten. Endlagen werden nicht aus der Zeit abgeleitet. Laufzeit + Reserve ohne Endlage ergibt GESTOPPT, kein unbekannt."},
-    {"type":"Label","caption":"LCN-GT2 vorbereitet: JVG_Command(GARAGENTOR_INSTANZ_ID, 'ZU') bei kurz, JVG_Command(..., 'AUF') bei lang. Ereignisse erst nach Test zuordnen."}
+    {
+      "type": "Label",
+      "caption": "JV Garagentor v1.1 – Torsteuerung getrennt von der WLED-Ampel. Fahrbefehle erst nach geprüfter Verdrahtung freigeben."
+    },
+    {
+      "type": "CheckBox",
+      "name": "EnableControl",
+      "caption": "Toransteuerung freigeben (erst nach CS320- und Relais-Test)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "RelayOpenVariable",
+      "caption": "Shelly AUF – O1, Status, ID 44228"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "RelayCloseVariable",
+      "caption": "Shelly ZU – O2, Status 1, ID 56652"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "RelayStopVariable",
+      "caption": "Shelly STOP – O3, Status 2, ID 55944"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "OnlineVariable",
+      "caption": "Shelly Erreichbar – ID 17585"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "EndOpenVariable",
+      "caption": "Endlage AUF (Boolean, TRUE bei Endlage; noch zu verdrahten)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "EndCloseVariable",
+      "caption": "Endlage ZU (Boolean, TRUE bei Endlage; noch zu verdrahten)"
+    },
+    {
+      "type": "CheckBox",
+      "name": "RequireEndStops",
+      "caption": "Fahrbefehle ohne beide Endlagenrückmeldungen sperren (empfohlen)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "MovementTimeoutSeconds",
+      "caption": "Fahr-/Blink-Timeout (Sekunden; max. 120)",
+      "minimum": 5,
+      "maximum": 120
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "OpenHoldSeconds",
+      "caption": "Nach Endlage AUF: Grün leuchten (Sekunden)",
+      "minimum": 0,
+      "maximum": 120
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "CloseHoldSeconds",
+      "caption": "Nach Endlage ZU: Rot leuchten (Sekunden)",
+      "minimum": 0,
+      "maximum": 120
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "BlinkPeriodMs",
+      "caption": "Blinkdauer je Pulszyklus in der Smartphone-Visualisierung (Millisekunden)",
+      "minimum": 500,
+      "maximum": 4000
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "PulseToleranceSeconds",
+      "caption": "Prüfung Rückfall der Shelly-Impulse nach Sekunden",
+      "minimum": 2,
+      "maximum": 15
+    },
+    {
+      "type": "Label",
+      "caption": "Fahrtsignale: AUF gelb pulsierend / ZU rot pulsierend bis Endlage oder Timeout (höchstens 120 s). Nach Endlage AUF 10 s grün, nach ZU 5 s rot; danach Ampel AUS, Positionsanzeige bleibt AUF bzw. ZU. STOP sofort AUS. Die Statuskachel verwendet denselben Signalwert. WLED-Pulsfrequenz separat im jeweiligen Preset anpassen."
+    },
+    {
+      "type": "Label",
+      "caption": "LCN-GT2 vorbereitet: JVG_Command(GARAGENTOR_INSTANZ_ID, 'ZU') bei kurz, JVG_Command(..., 'AUF') bei lang. Ereignisse erst nach Test zuordnen."
+    }
   ],
   "actions": []
 }

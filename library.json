@@ -3,8 +3,10 @@
   "author": "Johannes Veit",
   "name": "JV Garagentor",
   "url": "https://github.com/johannes-veit/JVGaragentor",
-  "compatibility": {"version": "9.0"},
-  "version": "1.0.0",
-  "build": 1,
+  "compatibility": {
+    "version": "9.0"
+  },
+  "version": "1.1.0",
+  "build": 2,
   "date": 1795300000
 }

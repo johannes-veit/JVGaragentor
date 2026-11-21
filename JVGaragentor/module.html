@@ -13,7 +13,16 @@
 #jvg-root .jvg-control:focus-visible {outline:4px solid #1467aa;outline-offset:-6px}
 #jvg-root .jvg-control:active .jvg-circle {transform:scale(.97)}
 #jvg-root .jvg-control:disabled {opacity:.45;cursor:not-allowed}
-#jvg-root .jvg-position {grid-column:2;grid-row:1/4;display:flex;align-items:center;justify-content:center;text-align:center;container-type:inline-size}
+#jvg-root .jvg-position {grid-column:2;grid-row:1/4;display:flex;align-items:center;justify-content:center;text-align:center;container-type:inline-size;transition:background-color .15s ease;background:#fff}
+/* Sanfte, kontrastreiche Statusbeleuchtung – keine aggressiven Stroboskopblitze. */
+#jvg-root .jvg-position.jvg-green {background:#9de1ba;box-shadow:0 0 13px #68bb8b88}
+#jvg-root .jvg-position.jvg-red {background:#efaaa7;box-shadow:0 0 13px #dc777788}
+#jvg-root .jvg-position.jvg-yellow-flash {animation:jvg-yellow var(--jvg-blink-ms,1600ms) ease-in-out infinite}
+#jvg-root .jvg-position.jvg-red-flash {animation:jvg-red var(--jvg-blink-ms,1600ms) ease-in-out infinite}
+@keyframes jvg-yellow {0%,100%{background:#faedbf;box-shadow:0 0 5px #eed08c33}50%{background:#f1c76b;box-shadow:0 0 15px #e7ba6199}}
+@keyframes jvg-red {0%,100%{background:#f9d5d0;box-shadow:0 0 5px #e9a5a133}50%{background:#ec9992;box-shadow:0 0 15px #dc777799}}
+@media (prefers-reduced-motion: reduce) {#jvg-root .jvg-position.jvg-yellow-flash {animation:none;background:#f3d893}#jvg-root .jvg-position.jvg-red-flash{animation:none;background:#efaaa7}}
+
 #jvg-root .jvg-position .jvg-label {left:10%;top:2%;font-size:clamp(15px,11cqw,27px)}
 #jvg-root .jvg-state {white-space:pre-line;overflow-wrap:break-word;font-size:clamp(24px,22cqw,96px);line-height:1.12;padding:2%;}
 #jvg-root .jvg-note {position:absolute;bottom:3%;left:5%;right:5%;font-size:clamp(11px,4.2cqw,16px);line-height:1.25;color:#a22;max-height:17%;overflow:hidden;overflow-wrap:anywhere}
@@ -50,10 +59,30 @@
   const buttons = root.querySelectorAll('[data-jvg-command]');
   const initial = __JV_INITIAL__;
   let ready = false;
+  let latest = null;
+  let shownSignal = -1;
+  const positionCard = root.querySelector('.jvg-position');
+  const effectClasses = ['jvg-yellow-flash','jvg-green','jvg-red-flash','jvg-red'];
+  function renderSignal() {
+    if (!latest) return;
+    let sig = Number(latest.signal || 0);
+    const until = Number(latest.effectUntil || 0);
+    // Bei ausbleibenden Live-Meldungen nach Ablauf lokal neutral werden.
+    if (sig < 0 || sig > 4 || !Number.isFinite(sig) || until <= 0 || Date.now() >= until * 1000) sig = 0;
+    if (shownSignal !== sig) {
+      positionCard.classList.remove(...effectClasses);
+      if (sig > 0) positionCard.classList.add(effectClasses[sig - 1]);
+      shownSignal = sig;
+    }
+  }
   function show(s) {
     if (!s || typeof s !== 'object') return;
     const valid = ['AUF','ZU','LÄUFT AUF','LÄUFT ZU','GESTOPPT'];
+    latest = s;
     const pos = valid.includes(s.position) ? s.position : 'GESTOPPT';
+    const period = Number(s.blinkPeriodMs || 1600);
+    positionCard.style.setProperty('--jvg-blink-ms', Math.min(4000, Math.max(500, period)) + 'ms');
+    renderSignal();
     root.querySelector('.jvg-state').textContent = pos.replace('LÄUFT ', 'LÄUFT\n');
     ready = s.enabled === true && s.online === true && s.ready === true;
     const canStop = s.enabled === true && s.online === true;
@@ -68,6 +97,8 @@
     requestAction('Command', b.dataset.jvgCommand);
   }));
   show(initial);
+  // Auch wenn die mobile Verbindung unterbrochen wird, endet die Darstellung rechtzeitig.
+  setInterval(renderSignal, 250);
   // HTML-SDK erhält Status-Updates über diese Funktion.
   window.handleMessage = function (msg) {
     try { show(typeof msg === 'string' ? JSON.parse(msg) : msg); }

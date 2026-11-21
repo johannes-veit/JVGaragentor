@@ -1,83 +1,93 @@
-# JV Garagentor – IP-Symcon 9.0
+# JV Garagentor v1.1.0 – IP-Symcon 9.0
 
 Eigenständige IP-Symcon-Bibliothek mit **zwei getrennten Gerätemodulen**:
 
-- **JVGaragentor**: Torbedienung AUF / STOP / ZU über einen Shelly Pro 3, Positionsauswertung und große, mobile HTML-SDK-Kachel.
-- **JVAmpel**: steuert ausschließlich die WLED-Ampel anhand der Positionsvariable. Keine Verbindung zu den Shelly-Relais oder zur CS320.
+- **JVGaragentor**: AUF / STOP / ZU über Shelly Pro 3, Endlagen- und Timeoutüberwachung, mobile Kachel mit großen Bedientasten und eigener farbiger Positionsanzeige.
+- **JVAmpel**: übernimmt **ausschließlich** das vom Tormodul berechnete Ampel-Signal (0–4) und schaltet darüber WLED vorne. Kein Torbefehl möglich.
 
-Basis: echte Schiebetor-Skripte und Verknüpfungen aus dem SymBox-Backup vom **07.11.2026**. Das alte Schiebetor wird weder verändert noch referenziert.
+Die Architektur wurde anhand der Schiebetor-Skripte und der Visualisierungsverknüpfungen aus dem SymBox-Backup vom 07.11.2026 vereinfacht. Das bestehende Schiebetor wird nicht verändert.
 
-## Installation
+## Zeiten und Signale (voreingestellt, editierbar)
 
-1. **IP-Symcon → Module Control → Hinzufügen**. Quelle/GitHub: `https://github.com/johannes-veit/JVGaragentor`; Branch `main`.
-2. Unter dem gewünschten Bereich je eine Instanz der Typen **JVGaragentor** und **JVAmpel** anlegen.
-3. Zunächst **keine Steuerung freigeben**. Die voreingestellten IDs prüfen. Danach Endlagen des Garagentors zuordnen und die vollständige Torlaufzeit messen.
-4. **JVGaragentor** als Kachel in der Kachelvisualisierung hinzufügen. Große Schaltflächen: AUF (oben), STOP (Mitte), ZU (unten), Position rechts.
-5. In **JVAmpel** die *Position*-Variable der Tor-Instanz auswählen. WLED-Ziel ist bereits auf **46199** voreingestellt. Erst nach Prüfung der WLED-Presets die Ampelautomatik einschalten.
+| Tatsächlicher Zustand | Positionstext in IP-Symcon | Ampel-Signal | WLED vorne | Beleuchtung der Positionskachel | Dauer |
+|---|---|---:|---|---|---|
+| AUF-Befehl erfolgreich | `LÄUFT AUF` | 1 | Preset 1: gelb pulsierend | **Gelb, sanft pulsierend** | Bis obere Endlage, maximal **120 s** |
+| Obere Endlage bestätigt | `AUF` | 2 | Preset 2: grün statisch | **Grün leuchtend** | **10 s** |
+| ZU-Befehl erfolgreich | `LÄUFT ZU` | 3 | Preset 3: rot pulsierend | **Rot, sanft pulsierend** | Bis untere Endlage, maximal **120 s** |
+| Untere Endlage bestätigt | `ZU` | 4 | Preset 4: rot statisch | **Rot leuchtend** | **5 s** |
+| STOP, Timeout oder abgelaufene Nachleuchtzeit | `GESTOPPT` bzw. weiter `AUF` oder `ZU` | 0 | WLED **AUS** | **Neutral, keine Beleuchtung** | Sofort bzw. nach Ablauf |
 
-**Wichtig**: Diese Software wurde lokal mit PHP-Mocks simuliert, **nicht** auf der realen SymBox bzw. mit der realen CS320 / dem echten Tor erprobt. Der Shelly wurde zuletzt als noch nicht elektrisch mit der CS320 verbunden gemeldet. Die Torsteuerung ist daher im Auslieferungszustand **gesperrt**; die Freigabe erfolgt erst nach einem separaten realen Inbetriebnahmetest.
+**Alle Zeiten werden in der JVGaragentor-Instanz bearbeitet:**
 
-## Bestätigte Zuordnungen: Shelly Pro 3 Garagentor
+- `MovementTimeoutSeconds`: Default **120 Sekunden**, 5–120 Sekunden; eine Konfiguration oberhalb 120 wird im Code auf 120 begrenzt.
+- `OpenHoldSeconds`: Default **10 Sekunden**, 0–120 Sekunden.
+- `CloseHoldSeconds`: Default **5 Sekunden**, 0–120 Sekunden.
+- `BlinkPeriodMs`: Default **1600 Millisekunden** je Pulszyklus, 500–4000 ms; verändert **nur die Smartphone-Kachel**, nicht die WLED-Presetgeschwindigkeit.
 
-Shelly-IP `192.168.103.73`, Symcon-Instanz **22849**.
+**Bei Ende der Nachleuchtzeit geht die WLED-Ampel aus und der Farbhintergrund der Kachel wird wieder weiß.** Der Positionstext bleibt `AUF` oder `ZU`, bis eine neue Meldung oder ein neuer Befehl vorliegt.
 
-| Funktion | Physischer Ausgang | Symcon-Anzeige | Variable | Impuls am Shelly |
-|---|---|---|---:|---|
-| AUF | O1 / Relais 1 | Status | **44228** | EIN → Auto-OFF nach 1 s |
-| ZU | O2 / Relais 2 | Status 1 | **56652** | EIN → Auto-OFF nach 1 s |
-| STOP | O3 / Relais 3 | Status 2 | **55944** | AUS → Auto-ON nach 1 s |
-| Erreichbarkeit | – | Erreichbar | **17585** | Boolean |
+Die Tor-Instanz besitzt dazu eine zusätzliche Integer-Variable **„Ampel-Signal“** (0=AUS, 1=gelb pulsierend, 2=grün, 3=rot pulsierend, 4=rot statisch). Sie ist der **einzige** Eingang der separaten JVAmpel-Instanz. Dieselbe Information mit Ablaufzeit steuert die Positionskachel. Auch ohne eine Statusmeldung wird die Browser-Farbe am Ablaufzeitpunkt lokal ausgeblendet. Beim ersten Modulstart wird eine bereits anliegende Endlage **ohne künstliches Nachleuchten** übernommen.
 
-Die **Endlagenvariablen** des Garagentors sind **noch unbekannt** und werden daher absichtlich **nicht vorbelegt**. Beide müssen Boolean sein und `TRUE` melden, wenn die zugehörige Endlage anliegt. Werkseitig werden Fahrbefehle ohne zwei zugewiesene Endlagen gesperrt. Die beiden Shelly-Eingangsstatus-Variablen aus den Screenshots sind **nicht als Endlagen bestätigt**.
+**Wichtige Abgrenzung:** Ablauf der maximalen 120 Sekunden bedeutet, dass die **Softwareanzeige** auf `GESTOPPT` geht, die Ampel ausgeschaltet wird und weitere Fahrbefehle bis zu STOP gesperrt sind. Das ist **kein elektrischer Stopp und kein Nachweis, dass der Antrieb tatsächlich steht**. Die Marantec CS320-FU ist separat sicherheitstechnisch auszulegen. Bei Netzwerk- oder WLED-Ausfall ist das Ausschalten der realen LED nicht garantiert. Die Ampel ist nur eine zusätzliche Informationsanzeige, keine Sicherheitseinrichtung.
 
-## Torsteuerung und Anzeige
+## Installation / Aktualisierung
 
-Die zentrale Schnittstelle kann von der Kachel, aus Skripten und später vom LCN GT2 verwendet werden:
+1. **IP-Symcon → Module Control → Hinzufügen**. Quelle: `https://github.com/johannes-veit/JVGaragentor`, Branch **`main`**. Bei bestehender Installation die Bibliothek aktualisieren.
+2. Die Geräteinstanzen **JVGaragentor** und **JVAmpel** anlegen bzw. bestehende Instanzen übernehmen.
+3. **JVGaragentor:** Shelly-Variablen kontrollieren, **beide tatsächlichen Endlagenrückmeldungen** zuweisen und die Laufzeit-/Nachleuchtzeiten einstellen. Die Toransteuerung ist standardmäßig gesperrt.
+4. **JVGaragentor-Kachel:** In die Symcon-Kachelvisualisierung einbinden. Linke Spalte: große AUF-/STOP-/ZU-Tasten; rechte Spalte: Status und synchron zur Ampel animierter Farbhintergrund.
+5. **JVAmpel:** Als Eingang unbedingt die **neue Integer-Variable „Ampel-Signal“** der JVGaragentor-Instanz auswählen. Das ist **nicht** die String-Variable „Position“. Beim Upgrade von v1.0.0 diese neue Zuordnung manuell setzen.
+6. WLED-Ausgänge prüfen: vorne Presets **#46199**, Ein/Aus **#29605**. Den hinteren Controller nicht doppelt ansteuern, da er über WLED-Synchronisierung folgt. **Vor Freigabe prüfen, ob alle vier Preset-/Effektwechsel auch hinten ankommen.**
+7. Nach realem Prüfablauf für Ampel und Tor **getrennt** die Automatikfreigaben setzen. Bis dahin beide deaktiviert lassen.
+
+**Kein Hardwaretest möglich:** Das Modul ist mit PHP-Mocks und JavaScript-Tests geprüft, aber nicht auf der echten SymBox und nicht mit der realen CS320-FU gefahren. Der Shelly Pro 3 wurde zuletzt als elektrisch noch nicht an die CS320 angeschlossen gemeldet. Daher keine Freigabe zum automatischen Torbetrieb ohne reale Abnahme.
+
+## Vorbelegte Symcon-IDs
+
+Shelly Pro 3 Garagentor: Instanz **22849**, IP `192.168.103.73`.
+
+| Befehl | Shelly | Symcon-Variable | Impuls |
+|---|---|---:|---|
+| AUF | O1, `Status` | **44228** | EIN, Auto-OFF nach 1 s |
+| ZU | O2, `Status 1` | **56652** | EIN, Auto-OFF nach 1 s |
+| STOP | O3, `Status 2` | **55944** | AUS, Auto-ON nach 1 s |
+| Erreichbar | – | **17585** | Boolean |
+
+**Die zwei Endlagen-IDs fehlen weiterhin.** Sie müssen jeweils eine Boolean-Variable darstellen, die **TRUE** meldet, wenn die zugehörige Endlage erreicht ist. Keines der vorhandenen Shelly-Eingangssignale ist bisher als Endlage bestätigt. Deshalb bleiben Fahrbefehle ohne eindeutige Endlagensignale standardmäßig gesperrt.
+
+## WLED-Ampel
+
+- WLED Garage vorne: **192.168.103.91**, Instanz **17732**, Preset **46199**, Power **29605**.
+- WLED Garage hinten: **192.168.103.92**, Instanz **31076**, folgt geräteseitig via WLED-Synchronisierung.
+- Presets in WLED-Master über **„Voreinstellungen“** einblenden. Diese Integer-Variable verarbeitet die Werte 1, 2, 3 und 4. Die Werte 0 und 5 werden für das Tor nicht verwendet.
+
+Die Blinkfrequenz der realen WLED-Ampel wird innerhalb der Presets festgelegt. Die Handy-Kachel verwendet dieselben **Farben und Zustandsdauern**, nicht zwangsläufig exakt dieselbe Blinkphase.
+
+## LCN-GT2 (für spätere Inbetriebnahme vorbereitet)
+
+Die zentrale Befehlsschnittstelle kann sowohl von der Kachel als auch von Skripten aufgerufen werden:
 
 ```php
-JVG_Command($garagentorInstanzID, 'AUF');  // öffnet
-JVG_Command($garagentorInstanzID, 'STOP'); // stoppt
-JVG_Command($garagentorInstanzID, 'ZU');   // schließt
+JVG_Command($garagentorInstanzID, 'ZU');  // später kurzer GT2-Tastendruck
+JVG_Command($garagentorInstanzID, 'AUF'); // später langer GT2-Tastendruck
+JVG_Command($garagentorInstanzID, 'STOP');
 ```
 
-Alternativ ist aus Skripten `IPS_RequestAction($garagentorInstanzID, 'Command', 'AUF');` möglich.
+Die konkrete Zuordnung des LCN-GT2 erfolgt erst nach Bekanntgabe der Tastenobjekte. Beim fahrenden Tor wird ein Richtungswechsel ohne vorherigen STOP gesperrt.
 
-Geplanter LCN-GT2: **Kurz = ZU**, **Lang = AUF**. Das Modul stellt die Befehle bereit, bindet aber bewusst **noch kein bestimmtes LCN-Tastenereignis** an, weil die GT2-Objekt-IDs und die LCN-Befehlsspezifikation dafür fehlen. Bei fahrendem Tor ist ein Richtungswechsel zunächst gesperrt, bis STOP gedrückt wurde.
+## Sicherheitsgrenzen
 
-| Anzeige rechts | Auslöser |
-|---|---|
-| `LÄUFT AUF` | erfolgreicher AUF-Befehl, obere Endlage noch nicht erreicht |
-| `AUF` | bestätigte obere Endlage |
-| `LÄUFT ZU` | erfolgreicher ZU-Befehl, untere Endlage noch nicht erreicht |
-| `ZU` | bestätigte untere Endlage |
-| `GESTOPPT` | STOP ohne bestätigte Endlage, Zeitüberschreitung oder widersprüchliche Sensoren |
+Das Modul überprüft Freigabe, Onlinezustand, schaltbare Relais, eindeutig zugeordnete IDs, Endlagen, Richtungsumkehr und Impulsrückfall. Nach Timeout wird die Anzeige `GESTOPPT`, das WLED-Signal 0 und bis zu einem STOP-Befehl keine weitere Fahrt angenommen. **Bei widersprüchlichen Endlagen bleibt die Bedienung gesperrt**.
 
-Nach **Laufzeit + Reserve** ohne richtige Endlagenmeldung wechselt die Anzeige zu `GESTOPPT`. Dies ist **eine Annahme**, kein physischer Stillstandsnachweis; vor einem neuen Fahrbefehl muss dann zuerst ausdrücklich **STOP** ausgelöst werden. Es gibt absichtlich keine Anzeige `UNBEKANNT`. Auch nach Neustart können Endlagensignale sofort übernommen werden. Bei unklaren Sensoren wird keine Endlage erfunden.
+Kein Ersatz für die CS320-Sicherheitseinrichtungen: Lichtgitter, Schaltleisten, Endlagen, Not-Halt und motorseitige Fahrzeitüberwachung müssen hardwareseitig funktionieren. **Eine zeitbasierte Anzeige darf nie als sicherer Stillstand oder als bestätigte Endlage interpretiert werden.**
 
-Schutzmechanismen: Hardware-Sperre im Testmodus; Shelly-Online-Prüfung; keine doppelt konfigurierten Ausgangs-IDs; Boolean- und Aktionsprüfung; gegenseitige Richtungsverriegelung; keine erneuten identischen Fahrimpulse; Sperre bei widersprüchlichen Endlagen; Laufzeitreserve; Impulsrückfallprüfung nach mehreren Sekunden und Rücksetzversuch für AUF/ZU.
+## Prüfungen
 
-**Nicht Bestandteil der Sicherheitstechnik**: Der Torantrieb Marantec CS320-FU und seine elektrischen/mechanischen Schutzsysteme (Lichtgitter, optische Schaltleisten, Not-Halt, Endlagen) müssen unabhängig und fachgerecht funktionieren. IP-Symcon, Shelly, WLAN und WLED sind **keine sicherheitsgerichteten Steuerungen**. Das Modul darf keine vorgeschriebenen Schutzfunktionen ersetzen.
+```sh
+php -l JVGaragentor/module.php
+php -l JVAmpel/module.php
+php tests/simulate.php
+node tests/visual_mock.js
+```
 
-## Ampel / WLED
-
-WLED-Master vorne: IP `192.168.103.91`, Instanz **17732**, Preset-Variable **46199**, Power-Variable **29605**.
-
-WLED-Master hinten: IP `192.168.103.92`, Instanz **31076**. **Nur vorne wird angesteuert**; hinten soll die bereits vorhandene geräteseitige WLED-Synchronisierung übernehmen. **Preset-/Effekt-Synchronisation muss mit beiden realen LED-Stripes getestet werden**, die bisher gemeldete Schaltsynchronisierung genügt dafür nicht als Nachweis.
-
-Im Modul `WLED (Websocket)` die Option **„Voreinstellungen“** aktivieren; dadurch wird im Master eine *einzige* Integer-Presetvariable erzeugt. Die Nutzer-Screenshots zeigen Presets 1–4 in dieser Variablenliste:
-
-| JVGaragentor-Status | Wert auf Variable 46199 | Anzeige |
-|---|---:|---|
-| `LÄUFT AUF` | 1 | gelb pulsierend |
-| `AUF` | 2 | grün dauerhaft |
-| `LÄUFT ZU` | 3 | rot pulsierend |
-| `ZU` | 4 | rot dauerhaft |
-| `GESTOPPT` | – | WLED standardmäßig AUS, damit keine falsche Fahr-/Endlagenanzeige bleibt |
-
-WLED-Presets 1–4 enthalten `on: true`: ein neuer Preset-Aufruf kann die zuvor ausgeschaltete Ampel wieder einschalten. Das muss beim echten WLED-Gerät validiert werden. Die Default-Option **„Bei GESTOPPT Ampel AUS“** kann in JVAmpel ausgeschaltet werden, dann bleibt der letzte Lampenzustand bestehen (nicht empfohlen, weil die Animation dann eine nicht mehr stattfindende Fahrt suggerieren kann).
-
-Wenn eine tatsächlich sichtbare **STOP-Anzeige** statt AUS benötigt wird, muss zuerst ein eigener, eindeutiger WLED-Preset definiert und die Ampel-Logik dafür erweitert werden. WLED ist ein **Hinweislicht**, keine sicherheitsgerichtete Signalanlage.
-
-## Tests
-
-Lokale Prüfung: `php tests/simulate.php` simuliert Tor- und Ampelvariablen und testet u. a. alle Richtungen, falsche Sensoren, Offline, Timeout, Freigabe, Impulse und Presets. Mit `php -l` die PHP-Dateien prüfen; JSON-Dateien werden auf Syntax geprüft. Hardwaretests und echte WLED-Synchronisierung können in dieser Testumgebung nicht ausgeführt werden.
+GitHub Actions prüft zusätzlich JSON und die JavaScript-Syntax. Reale Endlagen, Controller-Verfügbarkeit, WLED-Preset-Synchronisierung und die elektrische Sicherheit müssen vor dem Echtbetrieb vor Ort geprüft werden.

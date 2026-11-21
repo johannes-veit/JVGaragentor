@@ -33,3 +33,5 @@ jobs:
           node --check /tmp/jvg-tile.js
       - name: Simulierte Statuswechsel und Kommandos
         run: php tests/simulate.php
+      - name: HTML-SDK Anzeigezeit und Farblogik
+        run: node tests/visual_mock.js

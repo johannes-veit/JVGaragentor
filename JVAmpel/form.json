@@ -12,7 +12,7 @@
     {
       "type": "SelectVariable",
       "name": "SignalVariable",
-      "caption": "JVGaragentor: Ampel-Signal (Integer 0–4 aus Tor-Modul)"
+      "caption": "Ampel-Signal aus Torsteuerung (leer = automatisch, nur bei mehreren Toren selbst wählen)"
     },
     {
       "type": "SelectVariable",
@@ -30,7 +30,11 @@
     },
     {
       "type": "Label",
-      "caption": "Alle Zeiten bestimmt JVGaragentor. JVAmpel folgt nur einem numerischen Signal und verschickt niemals Torbefehle."
+      "caption": "Die Zeiten 120 s Fahr-/Blinkmaximum, 10 s Grün, 5 s Rot und 1600 ms Handy-Puls werden ausschließlich in der separaten Instanz JVGaragentor – Torsteuerung eingestellt. Keine doppelte Zeiteinstellung."
+    },
+    {
+      "type": "Label",
+      "caption": "Automatische Verknüpfung wird beim Start und alle 10 Sekunden geprüft. Bei genau einer Torinstanz musst du das Ampel-Signal nicht auswählen."
     }
   ],
   "actions": []

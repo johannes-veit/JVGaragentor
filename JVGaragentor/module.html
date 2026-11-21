@@ -56,13 +56,14 @@
     const pos = valid.includes(s.position) ? s.position : 'GESTOPPT';
     root.querySelector('.jvg-state').textContent = pos.replace('LÄUFT ', 'LÄUFT\n');
     ready = s.enabled === true && s.online === true && s.ready === true;
+    const canStop = s.enabled === true && s.online === true;
     const info = !s.enabled ? 'TESTMODUS – Befehle gesperrt' :
       !s.online ? 'Shelly OFFLINE – Befehle gesperrt' : (s.warning || (!s.ready ? 'Konfiguration prüfen – Befehle gesperrt' : ''));
     root.querySelector('.jvg-note').textContent = info;
-    buttons.forEach(b => { b.disabled = !ready; });
+    buttons.forEach(b => { b.disabled = (b.dataset.jvgCommand === 'STOP') ? !canStop : !ready; });
   }
   buttons.forEach(b => b.addEventListener('click', () => {
-    if (!ready || typeof requestAction !== 'function') return;
+    if (b.disabled || typeof requestAction !== 'function') return;
     // Der Server prüft die Freigabe und Endlagen nochmals.
     requestAction('Command', b.dataset.jvgCommand);
   }));

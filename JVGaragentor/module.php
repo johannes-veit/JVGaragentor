@@ -18,9 +18,10 @@ class JVGaragentor extends IPSModuleStrict
     {
         parent::Create();
         $this->RegisterPropertyBoolean('EnableControl', false);
-        $this->RegisterPropertyInteger('RelayOpenVariable', 0);
-        $this->RegisterPropertyInteger('RelayCloseVariable', 0);
-        $this->RegisterPropertyInteger('RelayStopVariable', 0);
+        $this->RegisterPropertyInteger('RelayOpenVariable', 44228);
+        $this->RegisterPropertyInteger('RelayCloseVariable', 56652);
+        $this->RegisterPropertyInteger('RelayStopVariable', 55944);
+        $this->RegisterPropertyInteger('RelayOnlineVariable', 17585);
         $this->RegisterPropertyInteger('EndOpenVariable', 0);
         $this->RegisterPropertyInteger('EndCloseVariable', 0);
         // Nur vorläufige Startwerte: reale Laufzeit vor Freigabe messen!
@@ -65,6 +66,9 @@ class JVGaragentor extends IPSModuleStrict
             $this->SendDebug('Befehl', 'Toransteuerung deaktiviert – kein Befehl gesendet', 0);
             return;
         }
+        if (!$this->IsOnline()) {
+            throw new RuntimeException('Garagentor-Shelly ist nicht erreichbar');
+        }
 
         $relayIds = [
             'AUF'  => $this->ReadPropertyInteger('RelayOpenVariable'),
@@ -81,7 +85,9 @@ class JVGaragentor extends IPSModuleStrict
         // Shelly muss den Impuls autonom nach 1 Sekunde zurückstellen:
         // AUF/ZU: EIN -> Auto-OFF. STOP: AUS -> Auto-ON.
         $relayValue = $Value !== 'STOP';
-        IPS_RequestAction($relayIds[$Value], $relayValue);
+        if (!RequestAction($relayIds[$Value], $relayValue)) {
+            throw new RuntimeException('Shelly-Befehl konnte nicht gesendet werden');
+        }
 
         if ($Value === 'STOP') {
             $this->WriteAttributeInteger('MovementStartedAt', 0);
@@ -178,11 +184,18 @@ class JVGaragentor extends IPSModuleStrict
         $this->Broadcast();
     }
 
+    private function IsOnline(): bool
+    {
+        $id = $this->ReadPropertyInteger('RelayOnlineVariable');
+        return $this->IsBooleanVariable($id) && GetValueBoolean($id);
+    }
+
     private function StatePayload(): array
     {
         return [
             'position' => (string) $this->GetValue('Position'),
-            'enabled' => $this->ReadPropertyBoolean('EnableControl')
+            'enabled' => $this->ReadPropertyBoolean('EnableControl'),
+            'online' => $this->IsOnline()
         ];
     }
 

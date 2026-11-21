@@ -131,10 +131,10 @@ class JVGaragentor extends IPSModuleStrict
         if ($command === 'STOP') {
             $this->WriteAttributeBoolean('NeedsStop', false);
             $this->WriteAttributeInteger('MovementStarted', 0);
-            $this->SetStatus($this->ResolvedEnd() ?? self::STOPPED, 0);
+            $this->UpdateGateState($this->ResolvedEnd() ?? self::STOPPED, 0);
         } else {
             $this->WriteAttributeInteger('MovementStarted', time());
-            $this->SetStatus($command === 'AUF' ? self::OPENING : self::CLOSING, $command === 'AUF' ? 1 : 3);
+            $this->UpdateGateState($command === 'AUF' ? self::OPENING : self::CLOSING, $command === 'AUF' ? 1 : 3);
         }
         $this->SetWarning('');
         return true;
@@ -165,7 +165,7 @@ class JVGaragentor extends IPSModuleStrict
         if ($open === true && $closed === true) {
             $this->WriteAttributeInteger('MovementStarted', 0);
             $this->WriteAttributeBoolean('NeedsStop', true);
-            $this->SetStatus(self::STOPPED, 0);
+            $this->UpdateGateState(self::STOPPED, 0);
             $this->SetWarning('Fehler: Beide Endlagen sind gleichzeitig aktiv.');
             return;
         }
@@ -178,7 +178,7 @@ class JVGaragentor extends IPSModuleStrict
             if ($position === self::STOPPED && $this->ReadAttributeInteger('MovementStarted') <= 0) {
                 $initialEnd = $this->ResolvedEnd();
                 if ($initialEnd !== null) {
-                    $this->SetStatus($initialEnd, 0);
+                    $this->UpdateGateState($initialEnd, 0);
                     return;
                 }
             }
@@ -193,7 +193,7 @@ class JVGaragentor extends IPSModuleStrict
             if ($started <= 0 || time() - $started >= $this->MovementTimeout()) {
                 $this->WriteAttributeInteger('MovementStarted', 0);
                 $this->WriteAttributeBoolean('NeedsStop', true);
-                $this->SetStatus(self::STOPPED, 0);
+                $this->UpdateGateState(self::STOPPED, 0);
                 $this->SetWarning('120-s-Maximum bzw. konfigurierter Timeout erreicht. Endlage nicht bestätigt – Torstillstand nicht nachgewiesen. Vor weiterer Fahrt STOP drücken.');
             }
             $this->Broadcast();
@@ -206,15 +206,15 @@ class JVGaragentor extends IPSModuleStrict
             $this->Arrived($resolved);
         } elseif (($position === 'AUF' && $open === false) ||
                   ($position === 'ZU' && $closed === false)) {
-            $this->SetStatus(self::STOPPED, 0);
+            $this->UpdateGateState(self::STOPPED, 0);
         } elseif (in_array($position, ['AUF', 'ZU'], true)) {
             // Nachleuchten zeitgesteuert beenden, Status aber beibehalten.
             $until = $this->ReadAttributeInteger('SignalUntil');
             if ((int)$this->GetValue('Signal') !== 0 && ($until <= 0 || time() >= $until)) {
-                $this->SetStatus($position, 0);
+                $this->UpdateGateState($position, 0);
             }
         } elseif ((int)$this->GetValue('Signal') !== 0) {
-            $this->SetStatus(self::STOPPED, 0);
+            $this->UpdateGateState(self::STOPPED, 0);
         }
         $this->Broadcast();
     }
@@ -262,7 +262,7 @@ class JVGaragentor extends IPSModuleStrict
             : $this->ReadPropertyInteger('CloseHoldSeconds');
         $seconds = min(120, max(0, $seconds));
         $signal = $seconds <= 0 ? 0 : ($position === 'AUF' ? 2 : 4);
-        $this->SetStatus($position, $signal, $seconds > 0 ? time() + $seconds : 0);
+        $this->UpdateGateState($position, $signal, $seconds > 0 ? time() + $seconds : 0);
     }
 
     /**
@@ -270,7 +270,7 @@ class JVGaragentor extends IPSModuleStrict
      * Ampel-Modul: 0 AUS, 1 gelb pulsierend, 2 grün, 3 rot pulsierend,
      * 4 rot statisch. Im Ruhezustand bleibt die POSITION sichtbar.
      */
-    private function SetStatus(string $position, int $signal, int $until = 0): void
+    private function UpdateGateState(string $position, int $signal, int $until = 0): void
     {
         $this->WriteAttributeInteger('SignalUntil', $until);
         if ((string)$this->GetValue('Position') !== $position) {

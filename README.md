@@ -1,4 +1,4 @@
-# JV Garagentor v1.1.1 – IP-Symcon 9.0
+# JV Garagentor v1.1.2 – IP-Symcon 9.0
 
 Eigenständige IP-Symcon-Bibliothek mit **zwei getrennten Gerätemodulen**:
 
@@ -100,3 +100,9 @@ GitHub Actions prüft zusätzlich JSON und die JavaScript-Syntax. Reale Endlagen
 - Bei mehreren Torinstanzen oder einer bewusst gesetzten, aber ungültigen manuellen Variable erfolgt **keine** automatische Wahl irgendeiner Quelle.
 - **Nicht automatisch belegbar:** Endlage AUF und Endlage ZU – echte, eindeutige Rückmeldungen der CS320 fehlen bisher; Standard-Sicherheitssperre bleibt aktiv. Fahrbefehle erst nach realer Prüfung freigeben.
 - **Keine Doppelung der Zeiten:** 120/10/5 Sekunden und Smartphone-Puls stehen im Konfigurationsformular von **JVGaragentor (Torsteuerung)**. JVAmpel hat keine eigenen Zeitwerte.
+
+## Fehlerkorrektur v1.1.2 – Torsteuerungsinstanz im Instanzdialog
+
+Die bisher intern definierte Methode `SetStatus(string, int, int)` kollidierte mit der öffentlichen und von IP-Symcon bereitgestellten Basisklassenmethode `SetStatus(int)`. Dies verhindert das Laden der Klasse `JVGaragentor` in IP-Symcon und erklärt, weshalb unter **Instanz hinzufügen** nur **JV Garagentor Ampelsteuerung** angeboten wurde.
+
+Die interne Zustandsfunktion heißt ab v1.1.2 `UpdateGateState`. Die Testumgebung bildet die reale Basisklassenmethode nun nach, sodass diese konkrete Regression im CI-Test einen PHP-Klassenladefehler auslöst und künftige Veröffentlichungen blockiert. Nach Aktualisierung der GitHub-Bibliothek auf **main/v1.1.2** im Symcon Module Control sollten unter Hersteller **JV** beide Gerätetypen zur Auswahl stehen: **JVGaragentor** und **JV Garagentor Ampelsteuerung**. Die Ampelinstanz nicht löschen oder doppelt anlegen. Der Hardwarebetrieb bleibt weiterhin bis zur Endlagen- und CS320-Prüfung gesperrt.

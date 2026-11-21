@@ -8,10 +8,22 @@ const VM_UPDATE = 10603;
 $GLOBALS['simVars'] = [];
 $GLOBALS['simActions'] = [];
 $GLOBALS['simNoAction'] = [];
+$GLOBALS['simGateInstances'] = [];
+$GLOBALS['simGateSignals'] = [];
 function mkVar(int $id, int $type, mixed $value, bool $action = true): void {
     $GLOBALS['simVars'][$id] = ['type'=>$type,'value'=>$value,'action'=>$action];
 }
 function IPS_VariableExists(int $id): bool { return isset($GLOBALS['simVars'][$id]); }
+function IPS_GetInstanceListByModuleID(string $guid): array {
+    return $guid === '{8193BC5B-9A6A-48A3-A70C-B69A73472328}' ? $GLOBALS['simGateInstances'] : [];
+}
+function IPS_InstanceExists(int $id): bool { return in_array($id, $GLOBALS['simGateInstances'], true); }
+function IPS_GetObjectIDByIdent(string $ident, int $parent): int {
+    if ($ident === 'Signal' && array_key_exists($parent, $GLOBALS['simGateSignals'])) {
+        return $GLOBALS['simGateSignals'][$parent];
+    }
+    throw new RuntimeException('Ident nicht vorhanden');
+}
 function IPS_GetVariable(int $id): array {
     $v=$GLOBALS['simVars'][$id];
     return ['VariableType'=>$v['type'],'VariableAction'=>$v['action']?999:0,'VariableCustomAction'=>0];
@@ -230,4 +242,52 @@ check($GLOBALS['simVars'][29605]['value']===false,'Ungültiges Signal schaltet v
 $ampel->props['EnableAmpel']=false;
 $old=count($GLOBALS['simActions']);$ampel->Sync();
 check(count($GLOBALS['simActions'])===$old,'Ampel AUS sperrt Schalten');
+
+/* Automatische Tor-Ampel-Verknüpfung: Instanz-IDs entstehen erst in Symcon. */
+$GLOBALS['simGateInstances'] = [21001];
+$GLOBALS['simGateSignals'] = [21001 => 80004];
+$ampelAuto = new JVAmpel();
+$ampelAuto->InstanceID = 21003;
+$ampelAuto->Create();
+$ampelAuto->ApplyChanges();
+check($ampelAuto->attrs['SubscribedVariable'] === 80004,
+    'Einzige Torinstanz wird ohne manuelle Variable erkannt');
+check(($ampelAuto->messages[80004] ?? null) === VM_UPDATE,
+    'Automatische Signalvariable auf VM_UPDATE abonniert');
+$form = json_decode($ampelAuto->GetConfigurationForm(), true);
+check(is_array($form) && str_contains(json_encode($form, JSON_UNESCAPED_UNICODE), 'Automatisch: Torinstanz #21001'),
+    'Formular zeigt automatisch ermittelte ID an');
+$ampelAuto->props['EnableAmpel'] = true;
+$GLOBALS['simVars'][80004]['value'] = 1;
+$ampelAuto->ApplyChanges();
+check($GLOBALS['simVars'][46199]['value'] === 1,
+    'Automatische Ampelverknüpfung schaltet Preset 1');
+$GLOBALS['simVars'][80004]['value'] = 3;
+$ampelAuto->MessageSink(time(), 80004, VM_UPDATE, []);
+check($GLOBALS['simVars'][46199]['value'] === 3,
+    'Signaländerung aus automatisch abonnierter Variable verarbeitet');
+$GLOBALS['simGateInstances'] = [];
+$ampelAuto->Sync();
+check($ampelAuto->attrs['SubscribedVariable'] === 0,
+    'Bei entferntem Tor wird die automatische Verknüpfung aufgehoben');
+$GLOBALS['simGateInstances'] = [21001, 21002];
+$GLOBALS['simGateSignals'][21002] = 80005;
+mkVar(80005, VARIABLETYPE_INTEGER, 0, false);
+$ampelAuto->Sync();
+check($ampelAuto->attrs['SubscribedVariable'] === 0,
+    'Bei zwei Torinstanzen keine willkürliche Wahl');
+$ampelAuto->props['SignalVariable'] = 80004;
+$ampelAuto->Sync();
+check($ampelAuto->attrs['SubscribedVariable'] === 80004,
+    'Explizite Zuordnung hat Vorrang auch bei mehreren Toren');
+$ampelAuto->props['SignalVariable'] = 123456;
+$ampelAuto->Sync();
+check($ampelAuto->attrs['SubscribedVariable'] === 0,
+    'Ungültige manuelle ID führt nicht zu automatischem Fallback');
+$ampelAuto->props['SignalVariable'] = 0;
+$GLOBALS['simGateInstances'] = [21001];
+$ampelAuto->Sync();
+check($ampelAuto->attrs['SubscribedVariable'] === 80004,
+    'Automatische Verbindung nach erneutem Auftauchen der Torinstanz wiederhergestellt');
+
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

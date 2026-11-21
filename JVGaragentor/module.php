@@ -1,17 +1,11 @@
 <?php
 declare(strict_types=1);
 
-/**
- * JVGaragentor – IP-Symcon 9.0 / HTML-SDK.
- *
- * Der Positionsstatus ist eine Anzeige-/Diagnosefunktion, KEINE
- * sicherheitsgerichtete Überwachung. Mechanische und elektrische
- * Schutzeinrichtungen bleiben vollständig Aufgabe der CS320.
- */
+/** JVGaragentor: Fahrbefehle über Shelly Pro 3; Endlagen-/Laufzeit-Status. */
 class JVGaragentor extends IPSModuleStrict
 {
-    private const MOVING_OPEN = 'LÄUFT AUF';
-    private const MOVING_CLOSE = 'LÄUFT ZU';
+    private const OPENING = 'LÄUFT AUF';
+    private const CLOSING = 'LÄUFT ZU';
     private const STOPPED = 'GESTOPPT';
 
     public function Create(): void
@@ -21,16 +15,20 @@ class JVGaragentor extends IPSModuleStrict
         $this->RegisterPropertyInteger('RelayOpenVariable', 44228);
         $this->RegisterPropertyInteger('RelayCloseVariable', 56652);
         $this->RegisterPropertyInteger('RelayStopVariable', 55944);
-        $this->RegisterPropertyInteger('RelayOnlineVariable', 17585);
+        $this->RegisterPropertyInteger('OnlineVariable', 17585);
         $this->RegisterPropertyInteger('EndOpenVariable', 0);
         $this->RegisterPropertyInteger('EndCloseVariable', 0);
-        // Nur vorläufige Startwerte: reale Laufzeit vor Freigabe messen!
+        $this->RegisterPropertyBoolean('RequireEndStops', true);
         $this->RegisterPropertyInteger('TravelSeconds', 60);
         $this->RegisterPropertyInteger('ReserveSeconds', 15);
-        $this->RegisterAttributeInteger('MovementStartedAt', 0);
-        $this->RegisterAttributeBoolean('LastOnline', false);
+        $this->RegisterPropertyInteger('PulseToleranceSeconds', 3);
+        $this->RegisterAttributeInteger('MovementStarted', 0);
+        $this->RegisterAttributeInteger('PulseSentAt', 0);
+        $this->RegisterAttributeInteger('PulseVariable', 0);
+        $this->RegisterAttributeBoolean('NeedsStop', false);
+        $this->RegisterAttributeString('LastSnapshot', '');
         $this->RegisterTimer('Monitor', 1000, 'JVG_Monitor($_IPS["TARGET"]);');
-        $this->SetVisualizationType(INSTANCE_VISUALIZATION_TYPE_HTML);
+        $this->SetVisualizationType(1);
     }
 
     public function ApplyChanges(): void
@@ -39,177 +37,281 @@ class JVGaragentor extends IPSModuleStrict
         if ($this->RegisterVariableString('Position', 'Position', [], 0)) {
             $this->SetValue('Position', self::STOPPED);
         }
+        $this->RegisterVariableString('Hinweis', 'Steuerung / Diagnose', [], 1);
         $this->SetTimerInterval('Monitor', 1000);
         $this->Monitor();
-        $this->Broadcast();
     }
 
-    public function GetVisualizationTile(): string
+    /** Derselbe Eingang für Kachel, Skripte, später LCN-GT2: JVG_Command(id, 'ZU'). */
+    public function Command(string $command): bool
     {
-        $html = file_get_contents(__DIR__ . '/module.html');
-        if ($html === false) {
-            return '<p>Garagentor-Kachel nicht gefunden.</p>';
+        if (!in_array($command, ['AUF', 'STOP', 'ZU'], true)) {
+            throw new InvalidArgumentException('Ungültiger Torbefehl');
+        }
+        if (!$this->ReadPropertyBoolean('EnableControl')) {
+            $this->SetWarning('Steuerung ist gesperrt (Testmodus).');
+            return false;
+        }
+        if (!$this->IsOnline()) {
+            $this->SetWarning('Shelly ist nicht erreichbar – kein Befehl gesendet.');
+            return false;
+        }
+        $ids = $this->RelayIds();
+        if (count(array_unique(array_values($ids))) !== 3) {
+            $this->SetWarning('Relaisvariablen sind nicht eindeutig zugeordnet.');
+            return false;
+        }
+        foreach ($ids as $id) {
+            if (!$this->ValidVariable($id, VARIABLETYPE_BOOLEAN) || !$this->HasAction($id)) {
+                $this->SetWarning('Shelly-Relaisvariablen fehlen oder sind nicht schaltbar.');
+                return false;
+            }
+        }
+        $endOpen = $this->EndSignal('EndOpenVariable');
+        $endClose = $this->EndSignal('EndCloseVariable');
+        if ($command !== 'STOP') {
+            if ($this->ReadAttributeBoolean('NeedsStop')) {
+                $this->SetWarning('Nach Laufzeitüberschreitung zuerst STOP drücken.');
+                return false;
+            }
+            if ($this->ReadPropertyBoolean('RequireEndStops') && ($endOpen === null || $endClose === null)) {
+                $this->SetWarning('Beide Endlagen-Rückmeldungen müssen zugeordnet sein.');
+                return false;
+            }
+            if (($this->ReadPropertyInteger('EndOpenVariable') > 0 &&
+                 $this->ReadPropertyInteger('EndOpenVariable') === $this->ReadPropertyInteger('EndCloseVariable')) ||
+                in_array($this->ReadPropertyInteger('EndOpenVariable'), array_values($ids), true) ||
+                in_array($this->ReadPropertyInteger('EndCloseVariable'), array_values($ids), true)) {
+                $this->SetWarning('Endlagenvariablen sind nicht eindeutig / überlappen mit Relais.');
+                return false;
+            }
+            if ($endOpen === true && $endClose === true) {
+                $this->SetWarning('Widersprüchliche Endlagen – Fahrbefehl gesperrt.');
+                return false;
+            }
+            $position = (string) $this->GetValue('Position');
+            // Keine automatische Richtungsumkehr: zuerst ausdrücklich STOP drücken.
+            if (($position === self::OPENING || $position === self::CLOSING) &&
+                (($position === self::OPENING && $command === 'ZU') ||
+                 ($position === self::CLOSING && $command === 'AUF'))) {
+                $this->SetWarning('Bei laufendem Tor zuerst STOP drücken.');
+                return false;
+            }
+            if (($command === 'AUF' && ($endOpen === true || $position === self::OPENING)) ||
+                ($command === 'ZU' && ($endClose === true || $position === self::CLOSING))) {
+                return true; // Kein weiterer Impuls auf bereits laufendes / erreichtes Ziel.
+            }
+            if (GetValueBoolean($ids['AUF']) || GetValueBoolean($ids['ZU'])) {
+                $this->SetWarning('Mindestens ein Fahrrelais ist noch EIN – neuer Befehl gesperrt.');
+                return false;
+            }
         }
 
-        $json = json_encode(
-            $this->StatePayload(),
-            JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
-        );
-        return str_replace('__INITIAL_STATE__', $json === false ? '{}' : $json, $html);
+        // AUF & ZU: EIN-Impuls mit Auto-OFF 1 s am Shelly.
+        // STOP: AUS-Impuls mit Auto-ON 1 s am Shelly.
+        $relay = $ids[$command];
+        $value = $command !== 'STOP';
+        try {
+            $sent = RequestAction($relay, $value);
+        } catch (Throwable $error) {
+            $this->SetWarning('Befehl fehlgeschlagen: ' . $error->getMessage());
+            return false;
+        }
+        if ($sent !== true) {
+            $this->SetWarning('Shelly hat den Befehl nicht angenommen.');
+            return false;
+        }
+        $this->WriteAttributeInteger('PulseSentAt', time());
+        $this->WriteAttributeInteger('PulseVariable', $relay);
+        if ($command === 'STOP') {
+            $this->WriteAttributeBoolean('NeedsStop', false);
+            $this->WriteAttributeInteger('MovementStarted', 0);
+            $this->SetPosition($this->ResolvedEnd() ?? self::STOPPED);
+        } else {
+            $this->WriteAttributeInteger('MovementStarted', time());
+            $this->SetPosition($command === 'AUF' ? self::OPENING : self::CLOSING);
+        }
+        $this->SetWarning('');
+        return true;
     }
 
     public function RequestAction(string $Ident, mixed $Value): void
     {
-        if ($Ident !== 'Command' || !is_string($Value) || !in_array($Value, ['AUF', 'STOP', 'ZU'], true)) {
-            throw new InvalidArgumentException('Ungültiger Garagentor-Befehl');
+        if ($Ident !== 'Command' || !is_string($Value)) {
+            throw new InvalidArgumentException('Unbekannte Aktion');
         }
-        if (!$this->ReadPropertyBoolean('EnableControl')) {
-            $this->SendDebug('Befehl', 'Toransteuerung deaktiviert – kein Befehl gesendet', 0);
-            return;
+        if (!$this->Command($Value)) {
+            // Kachel bleibt unverändert, Diagnose wird im Status angezeigt.
+            $this->SendDebug('Command', 'Befehl nicht ausgeführt: ' . (string)$Value, 0);
         }
-        if (!$this->IsOnline()) {
-            throw new RuntimeException('Garagentor-Shelly ist nicht erreichbar');
-        }
-
-        $relayIds = [
-            'AUF'  => $this->ReadPropertyInteger('RelayOpenVariable'),
-            'ZU'   => $this->ReadPropertyInteger('RelayCloseVariable'),
-            'STOP' => $this->ReadPropertyInteger('RelayStopVariable')
-        ];
-        // Alle drei Relais müssen korrekt zugeordnet sein, bevor eine Fahrt möglich ist.
-        foreach ($relayIds as $name => $id) {
-            if (!$this->IsBooleanVariable($id)) {
-                throw new RuntimeException('Shelly-Relais ' . $name . ' fehlt oder ist nicht Boolean');
-            }
-        }
-
-        // Shelly muss den Impuls autonom nach 1 Sekunde zurückstellen:
-        // AUF/ZU: EIN -> Auto-OFF. STOP: AUS -> Auto-ON.
-        $relayValue = $Value !== 'STOP';
-        if (!RequestAction($relayIds[$Value], $relayValue)) {
-            throw new RuntimeException('Shelly-Befehl konnte nicht gesendet werden');
-        }
-
-        if ($Value === 'STOP') {
-            $this->WriteAttributeInteger('MovementStartedAt', 0);
-            $this->UpdatePosition($this->ResolvedEndPosition() ?? self::STOPPED);
-            return;
-        }
-
-        $this->WriteAttributeInteger('MovementStartedAt', time());
-        $this->UpdatePosition($Value === 'AUF' ? self::MOVING_OPEN : self::MOVING_CLOSE);
     }
 
     public function Monitor(): void
     {
-        $online = $this->IsOnline();
-        if ($online !== $this->ReadAttributeBoolean('LastOnline')) {
-            $this->WriteAttributeBoolean('LastOnline', $online);
+        $this->CheckPulse();
+        $open = $this->EndSignal('EndOpenVariable');
+        $closed = $this->EndSignal('EndCloseVariable');
+        if ($open === true && $closed === true) {
+            $this->WriteAttributeInteger('MovementStarted', 0);
+            $this->SetPosition(self::STOPPED);
+            $this->SetWarning('Fehler: Beide Endlagen sind gleichzeitig aktiv.');
             $this->Broadcast();
-        }
-        $position = (string) $this->GetValue('Position');
-        $open = $this->EndActive('EndOpenVariable');
-        $closed = $this->EndActive('EndCloseVariable');
-
-        if ($open && $closed) {
-            // Widersprüchliche Endlagensignale niemals als Endlage anzeigen.
-            $this->SendDebug('Endlagen', 'Beide Endlagen melden gleichzeitig TRUE', 0);
-            $this->WriteAttributeInteger('MovementStartedAt', 0);
-            $this->UpdatePosition(self::STOPPED);
             return;
         }
+        $position = (string)$this->GetValue('Position');
+        if (($position === self::OPENING && $open === true) ||
+            ($position === self::CLOSING && $closed === true)) {
+            $this->Arrived($position === self::OPENING ? 'AUF' : 'ZU');
+            return;
+        }
+        // Endlagen sind auch nach Neustart / manueller CS320-Bedienung maßgeblich.
+        if ($position !== self::OPENING && $position !== self::CLOSING) {
+            $resolved = $this->ResolvedEnd();
+            if ($resolved !== null && $resolved !== $position) {
+                $this->Arrived($resolved);
+            } elseif (($position === 'AUF' && $open === false) ||
+                      ($position === 'ZU' && $closed === false)) {
+                $this->SetPosition(self::STOPPED);
+            }
+            $this->Broadcast();
+            return;
+        }
+        $started = $this->ReadAttributeInteger('MovementStarted');
+        $limit = max(5, $this->ReadPropertyInteger('TravelSeconds')) +
+            max(1, $this->ReadPropertyInteger('ReserveSeconds'));
+        if ($started <= 0 || (time() - $started) >= $limit) {
+            $this->WriteAttributeInteger('MovementStarted', 0);
+            $this->SetPosition(self::STOPPED);
+            $this->WriteAttributeBoolean('NeedsStop', true);
+            $this->SetWarning('Endlage nicht rechtzeitig bestätigt: Zwischenposition / Stopp angenommen. Vor weiterer Fahrt STOP drücken.');
+        }
+        $this->Broadcast();
+    }
 
-        if ($position === self::MOVING_OPEN) {
-            if ($open) {
-                $this->Arrived('AUF');
-                return;
-            }
-        } elseif ($position === self::MOVING_CLOSE) {
-            if ($closed) {
-                $this->Arrived('ZU');
-                return;
-            }
-        } else {
-            // Im Ruhezustand haben gemeldete Endlagen Vorrang.
-            $resolved = $open ? 'AUF' : ($closed ? 'ZU' : null);
-            if ($resolved !== null) {
-                $this->UpdatePosition($resolved);
-            } elseif ($position === 'AUF' || $position === 'ZU') {
-                // Endlage hat ihre Bestätigung verloren: keine Schein-Endlage behalten.
-                if ($this->ReadPropertyInteger($position === 'AUF' ? 'EndOpenVariable' : 'EndCloseVariable') > 0) {
-                    $this->UpdatePosition(self::STOPPED);
+    private function CheckPulse(): void
+    {
+        $sent = $this->ReadAttributeInteger('PulseSentAt');
+        $id = $this->ReadAttributeInteger('PulseVariable');
+        if ($sent <= 0 || $id <= 0) {
+            return;
+        }
+        if ((time() - $sent) <= max(2, $this->ReadPropertyInteger('PulseToleranceSeconds'))) {
+            return;
+        }
+        $this->WriteAttributeInteger('PulseSentAt', 0);
+        $this->WriteAttributeInteger('PulseVariable', 0);
+        if (!$this->ValidVariable($id, VARIABLETYPE_BOOLEAN)) {
+            return;
+        }
+        $isStopRelay = $id === $this->ReadPropertyInteger('RelayStopVariable');
+        $expected = $isStopRelay; // STOP bleibt EIN; AUF/ZU bleiben AUS.
+        if (GetValueBoolean($id) !== $expected) {
+            $this->SetWarning('Shelly-Impuls nicht zurückgesetzt! Auto-OFF/Auto-ON prüfen.');
+            // Bei klemmendem AUF/ZU Relais eine Rücksetzanforderung senden.
+            // Keine automatische Korrektur des STOP-Kontakts ohne Diagnose.
+            if (!$isStopRelay && $this->IsOnline() && $this->HasAction($id)) {
+                try { RequestAction($id, false); } catch (Throwable $e) {
+                    $this->SendDebug('AutoOFF', $e->getMessage(), 0);
                 }
             }
-            return;
-        }
-
-        $started = $this->ReadAttributeInteger('MovementStartedAt');
-        $limit = max(5, $this->ReadPropertyInteger('TravelSeconds'))
-            + max(1, $this->ReadPropertyInteger('ReserveSeconds'));
-        if ($started <= 0 || time() - $started >= $limit) {
-            $this->WriteAttributeInteger('MovementStartedAt', 0);
-            $this->UpdatePosition(self::STOPPED);
         }
     }
 
     private function Arrived(string $position): void
     {
-        $this->WriteAttributeInteger('MovementStartedAt', 0);
-        $this->UpdatePosition($position);
+        $this->WriteAttributeBoolean('NeedsStop', false);
+        $this->WriteAttributeInteger('MovementStarted', 0);
+        $this->SetPosition($position);
     }
 
-    private function ResolvedEndPosition(): ?string
+    private function SetPosition(string $position): void
     {
-        $open = $this->EndActive('EndOpenVariable');
-        $closed = $this->EndActive('EndCloseVariable');
-        if ($open === $closed) {
-            return null;
+        if ((string)$this->GetValue('Position') !== $position) {
+            $this->SetValue('Position', $position);
+            $this->Broadcast();
         }
-        return $open ? 'AUF' : 'ZU';
     }
 
-    private function EndActive(string $property): bool
+    private function SetWarning(string $warning): void
+    {
+        if ((string)$this->GetValue('Hinweis') !== $warning) {
+                $this->SetValue('Hinweis', $warning);
+            $this->Broadcast();
+        }
+    }
+
+    private function ResolvedEnd(): ?string
+    {
+        $open = $this->EndSignal('EndOpenVariable');
+        $closed = $this->EndSignal('EndCloseVariable');
+        if ($open === true && $closed === false) return 'AUF';
+        if ($closed === true && $open === false) return 'ZU';
+        return null;
+    }
+
+    private function EndSignal(string $property): ?bool
     {
         $id = $this->ReadPropertyInteger($property);
-        return $this->IsBooleanVariable($id) && GetValueBoolean($id);
+        return $this->ValidVariable($id, VARIABLETYPE_BOOLEAN) ? GetValueBoolean($id) : null;
     }
 
-    private function IsBooleanVariable(int $id): bool
+    private function RelayIds(): array
     {
-        return $id > 0
-            && IPS_VariableExists($id)
-            && IPS_GetVariable($id)['VariableType'] === VARIABLETYPE_BOOLEAN;
-    }
-
-    private function UpdatePosition(string $position): void
-    {
-        if ((string) $this->GetValue('Position') === $position) {
-            return;
-        }
-        $this->SetValue('Position', $position);
-        $this->Broadcast();
+        return [
+            'AUF' => $this->ReadPropertyInteger('RelayOpenVariable'),
+            'STOP' => $this->ReadPropertyInteger('RelayStopVariable'),
+            'ZU' => $this->ReadPropertyInteger('RelayCloseVariable')
+        ];
     }
 
     private function IsOnline(): bool
     {
-        $id = $this->ReadPropertyInteger('RelayOnlineVariable');
-        return $this->IsBooleanVariable($id) && GetValueBoolean($id);
+        $id = $this->ReadPropertyInteger('OnlineVariable');
+        return $this->ValidVariable($id, VARIABLETYPE_BOOLEAN) && GetValueBoolean($id);
     }
 
-    private function StatePayload(): array
+    private function ValidVariable(int $id, int $type): bool
     {
+        return $id > 0 && IPS_VariableExists($id) &&
+            (int)IPS_GetVariable($id)['VariableType'] === $type;
+    }
+
+    private function HasAction(int $id): bool
+    {
+        if (!$this->ValidVariable($id, VARIABLETYPE_BOOLEAN)) return false;
+        $v = IPS_GetVariable($id);
+        return (int)($v['VariableCustomAction'] ?: $v['VariableAction']) > 0;
+    }
+
+    private function Snapshot(): array
+    {
+        $requiredEndStopsMissing = $this->ReadPropertyBoolean('RequireEndStops') &&
+            ($this->EndSignal('EndOpenVariable') === null || $this->EndSignal('EndCloseVariable') === null);
+        $diagnostic = (string)$this->GetValue('Hinweis');
+        if ($requiredEndStopsMissing && $diagnostic === '') $diagnostic = 'Endlagen fehlen – Fahrbefehle gesperrt.';
         return [
-            'position' => (string) $this->GetValue('Position'),
+            'position' => (string)$this->GetValue('Position'),
+            'warning' => $diagnostic,
             'enabled' => $this->ReadPropertyBoolean('EnableControl'),
+            'ready' => !$requiredEndStopsMissing && !$this->ReadAttributeBoolean('NeedsStop'),
             'online' => $this->IsOnline()
         ];
     }
 
     private function Broadcast(): void
     {
-        $data = json_encode($this->StatePayload(), JSON_UNESCAPED_UNICODE);
-        if ($data !== false) {
-            $this->UpdateVisualizationValue($data);
-        }
+        $json = json_encode($this->Snapshot(), JSON_UNESCAPED_UNICODE);
+        if ($json === false || $json === $this->ReadAttributeString('LastSnapshot')) return;
+        $this->WriteAttributeString('LastSnapshot', $json);
+        $this->UpdateVisualizationValue($json);
+    }
+
+    public function GetVisualizationTile(): string
+    {
+        $html = @file_get_contents(__DIR__ . '/module.html');
+        if ($html === false) return '<p>JVGaragentor: Kachel-Datei fehlt.</p>';
+        $json = json_encode($this->Snapshot(), JSON_UNESCAPED_UNICODE |
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+        return str_replace('__JV_INITIAL__', $json === false ? '{}' : $json, $html);
     }
 }

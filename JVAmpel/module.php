@@ -12,9 +12,8 @@ class JVAmpel extends IPSModuleStrict
         parent::Create();
         $this->RegisterPropertyBoolean('EnableAmpel', false);
         $this->RegisterPropertyInteger('PositionVariable', 0);
-        $this->RegisterPropertyInteger('PresetVariable1', 0);
-        $this->RegisterPropertyInteger('PresetVariable2', 0);
-        $this->RegisterPropertyInteger('StopPreset', 4);
+        $this->RegisterPropertyInteger('PresetVariable', 46199);
+        $this->RegisterPropertyInteger('StopPreset', 0);
         $this->RegisterAttributeInteger('SubscribedVariable', 0);
         $this->RegisterVariableString('AmpelStatus', 'Ampel-Status', [], 0);
         $this->RegisterTimer('Retry', 30000, 'JVGA_Sync($_IPS["TARGET"]);');
@@ -65,45 +64,29 @@ class JVAmpel extends IPSModuleStrict
             'GESTOPPT' => $this->ReadPropertyInteger('StopPreset'),
             default => 0
         };
-        if ($preset < 1 || $preset > 250) {
+        if ($preset < 1 || $preset > 4) {
             $this->SetValue('AmpelStatus', 'Kein Preset für ' . $position);
             return;
         }
-        $success = 0;
-        $failed = [];
-        $configured = 0;
-        foreach (['PresetVariable1', 'PresetVariable2'] as $setting) {
-            $variable = $this->ReadPropertyInteger($setting);
-            if ($variable <= 0) {
-                continue;
-            }
-            $configured++;
-            if (!$this->IsVariableType($variable, VARIABLETYPE_INTEGER)) {
-                $failed[] = $setting . ': ungültige Integer-Variable';
-                continue;
-            }
-            if (GetValueInteger($variable) === $preset) {
-                $success++;
-                continue;
-            }
-            try {
-                if (RequestAction($variable, $preset)) {
-                    $success++;
-                } else {
-                    $failed[] = $setting . ': Preset konnte nicht geschaltet werden';
-                }
-            } catch (Throwable $e) {
-                $failed[] = $setting . ': ' . $e->getMessage();
-            }
+        $variable = $this->ReadPropertyInteger('PresetVariable');
+        if (!$this->IsVariableType($variable, VARIABLETYPE_INTEGER)) {
+            $this->SetValue('AmpelStatus', 'WLED vorne: Preset-Variable fehlt oder ist nicht Integer');
+            return;
         }
-        if ($configured === 0) {
-            $this->SetValue('AmpelStatus', 'Keine WLED-Presetvariablen hinterlegt');
-        } else {
-            $this->SetValue(
-                'AmpelStatus',
-                $position . ' → Preset ' . $preset . ' (' . $success . '/' . $configured .
-                ' WLED)' . ($failed === [] ? '' : ': ' . implode('; ', $failed))
-            );
+        // Nur der fuehrende WLED-Controller wird angesteuert.
+        // Die Synchronisierung zum hinteren Controller erfolgt in WLED selbst.
+        if (GetValueInteger($variable) === $preset) {
+            $this->SetValue('AmpelStatus', $position . ' → Preset ' . $preset . ' (bereits ausgewaehlt)');
+            return;
+        }
+        try {
+            if (!RequestAction($variable, $preset)) {
+                $this->SetValue('AmpelStatus', $position . ' → Preset ' . $preset . ' (Senden fehlgeschlagen)');
+                return;
+            }
+            $this->SetValue('AmpelStatus', $position . ' → Preset ' . $preset . ' an WLED vorne gesendet');
+        } catch (Throwable $e) {
+            $this->SetValue('AmpelStatus', 'WLED-Fehler: ' . $e->getMessage());
         }
     }
 

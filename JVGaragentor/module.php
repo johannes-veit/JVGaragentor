@@ -26,6 +26,7 @@ class JVGaragentor extends IPSModuleStrict
         $this->RegisterPropertyInteger('PulseToleranceSeconds', 3);
         $this->RegisterAttributeInteger('MovementStarted', 0);
         $this->RegisterAttributeInteger('SignalUntil', 0);
+        $this->RegisterAttributeBoolean('StateInitialized', false);
         $this->RegisterAttributeInteger('PulseSentAt', 0);
         $this->RegisterAttributeInteger('PulseVariable', 0);
         $this->RegisterAttributeBoolean('NeedsStop', false);
@@ -170,6 +171,18 @@ class JVGaragentor extends IPSModuleStrict
         }
 
         $position = (string)$this->GetValue('Position');
+        // Beim ersten Start eine bereits anliegende Endlage übernehmen,
+        // aber nicht ohne tatsächliches neues Ereignis Nachleuchten auslösen.
+        if (!$this->ReadAttributeBoolean('StateInitialized')) {
+            $this->WriteAttributeBoolean('StateInitialized', true);
+            if ($position === self::STOPPED && $this->ReadAttributeInteger('MovementStarted') <= 0) {
+                $initialEnd = $this->ResolvedEnd();
+                if ($initialEnd !== null) {
+                    $this->SetStatus($initialEnd, 0);
+                    return;
+                }
+            }
+        }
         if (($position === self::OPENING && $open === true) ||
             ($position === self::CLOSING && $closed === true)) {
             $this->Arrived($position === self::OPENING ? 'AUF' : 'ZU');

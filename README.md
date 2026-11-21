@@ -26,7 +26,7 @@ Die Architektur wurde anhand der Schiebetor-Skripte und der Visualisierungsverkn
 
 **Bei Ende der Nachleuchtzeit geht die WLED-Ampel aus und der Farbhintergrund der Kachel wird wieder weiß.** Der Positionstext bleibt `AUF` oder `ZU`, bis eine neue Meldung oder ein neuer Befehl vorliegt.
 
-Die Tor-Instanz besitzt dazu eine zusätzliche Integer-Variable **„Ampel-Signal“** (0=AUS, 1=gelb pulsierend, 2=grün, 3=rot pulsierend, 4=rot statisch). Sie ist der **einzige** Eingang der separaten JVAmpel-Instanz. Dieselbe Information mit Ablaufzeit steuert die Positionskachel. Auch ohne eine Statusmeldung wird die Browser-Farbe am Ablaufzeitpunkt lokal ausgeblendet.
+Die Tor-Instanz besitzt dazu eine zusätzliche Integer-Variable **„Ampel-Signal“** (0=AUS, 1=gelb pulsierend, 2=grün, 3=rot pulsierend, 4=rot statisch). Sie ist der **einzige** Eingang der separaten JVAmpel-Instanz. Dieselbe Information mit Ablaufzeit steuert die Positionskachel. Auch ohne eine Statusmeldung wird die Browser-Farbe am Ablaufzeitpunkt lokal ausgeblendet. Beim ersten Modulstart wird eine bereits anliegende Endlage **ohne künstliches Nachleuchten** übernommen.
 
 **Wichtige Abgrenzung:** Ablauf der maximalen 120 Sekunden bedeutet, dass die **Softwareanzeige** auf `GESTOPPT` geht, die Ampel ausgeschaltet wird und weitere Fahrbefehle bis zu STOP gesperrt sind. Das ist **kein elektrischer Stopp und kein Nachweis, dass der Antrieb tatsächlich steht**. Die Marantec CS320-FU ist separat sicherheitstechnisch auszulegen. Bei Netzwerk- oder WLED-Ausfall ist das Ausschalten der realen LED nicht garantiert. Die Ampel ist nur eine zusätzliche Informationsanzeige, keine Sicherheitseinrichtung.
 

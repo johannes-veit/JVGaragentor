@@ -78,8 +78,8 @@ function resetHardware(): void {
 resetHardware();
 $gate=new JVGaragentor();$gate->Create();$gate->props['EndOpenVariable']=80001;$gate->props['EndCloseVariable']=80002;$gate->ApplyChanges();
 check($gate->values['Position']==='ZU','Initiale Endlage aus Sensor erkannt');
-check($gate->values['Signal']===4,'Endlage ZU -> rotes Dauersignal');
-check($gate->attrs['SignalUntil']>=time()+4, 'Rot 5 s nach Endlage ZU');
+check($gate->values['Signal']===0,'Beim Start keine Schein-Nachleuchtzeit');
+check($gate->attrs['SignalUntil']===0, 'Vorhandene Endlage beim Start bleibt neutral');
 check($gate->props['MovementTimeoutSeconds']===120,'Maximaldauer 120 Sekunden');
 check($gate->props['OpenHoldSeconds']===10 && $gate->props['CloseHoldSeconds']===5,'Einstellbare Nachleuchtzeiten 10/5 s');
 check(!$gate->Command('AUF'),'Torsteuerung im Auslieferungszustand gesperrt');
@@ -132,6 +132,7 @@ $GLOBALS['simVars'][80002]['value']=true;
 $gate->Monitor();
 check($gate->values['Position']==='ZU','Endlage ZU nach Stopp erkannt');
 check($gate->values['Signal']===4,'Endlage ZU zeigt rotes Nachleuchten nach Zwischenposition');
+check($gate->attrs['SignalUntil']>=time()+4, 'Rot leuchtet fünf Sekunden nach tatsächlichem ZU-Ereignis');
 $GLOBALS['simVars'][17585]['value']=false;
 check(!$gate->Command('AUF'),'Offline-Sperre');
 $GLOBALS['simVars'][17585]['value']=true;

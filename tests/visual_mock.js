@@ -1,0 +1,65 @@
+'use strict';
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const html = fs.readFileSync(path.join(__dirname, '../JVGaragentor/module.html'), 'utf8');
+const found = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+assert.equal(found.length, 1, 'Genau ein Kachelscript');
+let fakeTime = 1_800_000_000_000;
+let checks = 0;
+const classes = new Set();
+const pos = {classList:{add(...x){x.forEach(y=>classes.add(y))}, remove(...x){x.forEach(y=>classes.delete(y))}},style:{setProperty(n,v){pos[n]=v}}};
+const state = {textContent:''};
+const note = {textContent:''};
+const buttons = ['AUF','STOP','ZU'].map(cmd=>({disabled:true,dataset:{jvgCommand:cmd}, addEventListener(type,handler){this[type]=handler}}));
+const root = {querySelectorAll(){return buttons},querySelector(sel){return sel === '.jvg-position'?pos:sel === '.jvg-state'?state:sel === '.jvg-note'?note:null}};
+const rootDoc={getElementById(id){return id==='jvg-root'?root:null}};
+let tick;
+const ctx = {
+  document: rootDoc, window:{}, Date:{now:()=>fakeTime},
+  setInterval(fn,ms){assert.equal(ms,250);tick=fn},
+  console, requestAction(){}, Number, Math, JSON, Set
+};
+const initial = {position:'GESTOPPT', signal:0,effectUntil:0,blinkPeriodMs:1600,enabled:false,online:true,ready:false,warning:''};
+const src = found[0][1].replace('__JV_INITIAL__', JSON.stringify(initial));
+vm.runInNewContext(src, ctx, {filename:'module.html:<script>'});
+function check(condition,label){assert.ok(condition,label);checks++}
+function push(signal,position='GESTOPPT',expires=100,flags={}){
+  ctx.window.handleMessage(JSON.stringify({position,signal,effectUntil:Math.floor(fakeTime/1000)+expires,blinkPeriodMs:1600,enabled:true,online:true,ready:true,warning:'',...flags}));
+}
+check(typeof tick==='function','Browser-Timer registriert');
+check(buttons.every(b=>b.disabled), 'Initialzustand gesperrt');
+push(1,'LÄUFT AUF');
+check(classes.has('jvg-yellow-flash'),'Auf-Fahrt: gelb blinkend');
+check(state.textContent==='LÄUFT\nAUF','Kachel zeigt LÄUFT AUF');
+check(buttons.every(b=>!b.disabled),'Freigabe der Tasten');
+push(2,'AUF',10);
+check(classes.has('jvg-green')&&!classes.has('jvg-yellow-flash'),'Endlage AUF: grün statisch');
+fakeTime += 10500;
+tick();
+check(classes.size===0 && state.textContent==='AUF','Nach zehn Sekunden Farbe aus, Text bleibt AUF');
+push(3,'LÄUFT ZU');
+check(classes.has('jvg-red-flash'),'Zu-Fahrt: rot blinkend');
+push(4,'ZU',5);
+check(classes.has('jvg-red'),'Endlage ZU: rot statisch');
+fakeTime += 5500;
+tick();
+check(classes.size===0 && state.textContent==='ZU','Nach fünf Sekunden rot aus, ZU bleibt');
+push(1,'LÄUFT AUF',120);
+fakeTime += 121000;
+tick();
+check(classes.size===0,'Timeout-Schutz der Kachel bei fehlender Symcon-Meldung');
+push(3,'LÄUFT ZU',10);
+push(0,'GESTOPPT',0);
+check(classes.size===0 && state.textContent==='GESTOPPT','STOP stellt Farbe sofort ab');
+push(9,'AUF');
+check(classes.size===0,'Ungültiger Signalwert führt nicht zu Farbe');
+push(2,'AUF',10,{online:false});
+check(buttons.every(b=>b.disabled),'Offline sperrt Tasten');
+push(2,'AUF',10,{ready:false});
+check(buttons.find(b=>b.dataset.jvgCommand==='STOP').disabled===false,'STOP bleibt bei Konfigurationssperre bedienbar');
+check(buttons.find(b=>b.dataset.jvgCommand==='AUF').disabled===true,'Fahrbefehle bleiben gesperrt');
+check(html.includes('@media (prefers-reduced-motion: reduce)'),'Weniger Bewegung für sensible Nutzer');
+check(html.includes('jvg-yellow') && html.includes('jvg-red'),'Beide sanften CSS-Blinkanimationen vorhanden');
+console.log('PASS '+checks+' HTML/JS-Visualisierungstests');

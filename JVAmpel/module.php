@@ -8,10 +8,9 @@ class JVAmpel extends IPSModuleStrict
     {
         parent::Create();
         $this->RegisterPropertyBoolean('EnableAmpel', false);
-        $this->RegisterPropertyInteger('PositionVariable', 0);
+        $this->RegisterPropertyInteger('SignalVariable', 0);
         $this->RegisterPropertyInteger('PresetVariable', 46199);
         $this->RegisterPropertyInteger('PowerVariable', 29605);
-        $this->RegisterPropertyBoolean('SwitchOffWhenStopped', true);
         $this->RegisterAttributeInteger('SubscribedVariable', 0);
         $this->RegisterVariableString('AmpelStatus', 'Ampel-Status', [], 0);
         $this->RegisterTimer('Synchronize', 10000, 'JVGA_Sync($_IPS["TARGET"]);');
@@ -22,11 +21,11 @@ class JVAmpel extends IPSModuleStrict
         parent::ApplyChanges();
         $this->RegisterVariableString('AmpelStatus', 'Ampel-Status', [], 0);
         $previous = $this->ReadAttributeInteger('SubscribedVariable');
-        $current = $this->ReadPropertyInteger('PositionVariable');
+        $current = $this->ReadPropertyInteger('SignalVariable');
         if ($previous > 0 && ($previous !== $current || !IPS_VariableExists($previous))) {
             $this->UnregisterMessage($previous, VM_UPDATE);
         }
-        if ($current > 0 && $this->IsVariable($current, VARIABLETYPE_STRING)) {
+        if ($current > 0 && $this->IsVariable($current, VARIABLETYPE_INTEGER)) {
             $this->RegisterMessage($current, VM_UPDATE);
             $this->WriteAttributeInteger('SubscribedVariable', $current);
         } else {
@@ -38,7 +37,7 @@ class JVAmpel extends IPSModuleStrict
 
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
-        if ($Message === VM_UPDATE && $SenderID === $this->ReadPropertyInteger('PositionVariable')) {
+        if ($Message === VM_UPDATE && $SenderID === $this->ReadPropertyInteger('SignalVariable')) {
             $this->Sync();
         }
     }
@@ -49,36 +48,29 @@ class JVAmpel extends IPSModuleStrict
             $this->SetStatusText('Automatik AUS');
             return;
         }
-        $source = $this->ReadPropertyInteger('PositionVariable');
+        $source = $this->ReadPropertyInteger('SignalVariable');
         $presetVar = $this->ReadPropertyInteger('PresetVariable');
-        if (!$this->IsVariable($source, VARIABLETYPE_STRING) ||
+        if (!$this->IsVariable($source, VARIABLETYPE_INTEGER) ||
             !$this->IsVariable($presetVar, VARIABLETYPE_INTEGER)) {
-            $this->SetStatusText('Konfigurationsfehler: Position oder WLED-Voreinstellungen fehlen.');
+            $this->SetStatusText('Konfigurationsfehler: Ampel-Signal oder WLED-Voreinstellungen fehlen.');
             return;
         }
-        $position = GetValueString($source);
-        $preset = match ($position) {
-            'LÄUFT AUF' => 1,
-            'AUF' => 2,
-            'LÄUFT ZU' => 3,
-            'ZU' => 4,
-            default => 0
-        };
-        // Nie eine Endlage nur aus einer Zwischenposition ableiten.
-        if ($position === 'GESTOPPT') {
-            if (!$this->ReadPropertyBoolean('SwitchOffWhenStopped')) {
-                $this->SetStatusText('GESTOPPT – Anzeige unverändert (bewusst konfiguriert).');
-                return;
-            }
+        $signal = GetValueInteger($source);
+        if (!in_array($signal, [0, 1, 2, 3, 4], true)) {
+            $this->SetStatusText('Ungültiges Ampel-Signal – WLED vorsorglich AUS.');
+            $signal = 0;
+        }
+        // Signal 0 enthält STOPP, Timeout und abgelaufene Nachleuchtzeit.
+        if ($signal === 0) {
             $power = $this->ReadPropertyInteger('PowerVariable');
             if (!$this->IsVariable($power, VARIABLETYPE_BOOLEAN)) {
-                $this->SetStatusText('GESTOPPT – WLED-Ein/Aus-Variable fehlt; keine Umschaltung.');
+                $this->SetStatusText('Ampel AUS – WLED-Ein/Aus-Variable fehlt.');
                 return;
             }
             if (GetValueBoolean($power)) {
                 try {
                     if (!RequestAction($power, false)) {
-                        $this->SetStatusText('GESTOPPT – Ausschalten fehlgeschlagen.');
+                        $this->SetStatusText('Ampel AUS – Ausschalten fehlgeschlagen.');
                         return;
                     }
                 } catch (Throwable $e) {
@@ -86,25 +78,25 @@ class JVAmpel extends IPSModuleStrict
                     return;
                 }
             }
-            $this->SetStatusText('GESTOPPT – WLED AUS (nicht gleichbedeutend mit ZU).');
+            $this->SetStatusText('Ampel AUS (Signal 0).');
             return;
         }
-        if ($preset < 1 || $preset > 4) {
+        if ($signal < 1 || $signal > 4) {
             $this->SetStatusText('Nicht unterstützter Torstatus – keine WLED-Änderung.');
             return;
         }
         $power = $this->ReadPropertyInteger('PowerVariable');
         $isPowerOff = $this->IsVariable($power, VARIABLETYPE_BOOLEAN) && !GetValueBoolean($power);
-        if (GetValueInteger($presetVar) === $preset && !$isPowerOff) {
-            $this->SetStatusText($position . ' – Preset ' . $preset . ' aktiv.');
+        if (GetValueInteger($presetVar) === $signal && !$isPowerOff) {
+            $this->SetStatusText('Signal ' . $signal . ' – Preset ' . $signal . ' aktiv.');
             return;
         }
         try {
-            if (!RequestAction($presetVar, $preset)) {
-                $this->SetStatusText($position . ' – Preset ' . $preset . ' nicht angenommen.');
+            if (!RequestAction($presetVar, $signal)) {
+                $this->SetStatusText('Signal ' . $signal . ' – Preset ' . $signal . ' nicht angenommen.');
                 return;
             }
-            $this->SetStatusText($position . ' – Preset ' . $preset . ' an WLED vorne gesendet.');
+            $this->SetStatusText('Signal ' . $signal . ' – Preset ' . $signal . ' an WLED vorne gesendet.');
         } catch (Throwable $e) {
             $this->SetStatusText('WLED Fehler: ' . $e->getMessage());
         }

@@ -19,10 +19,13 @@ class JVGaragentor extends IPSModuleStrict
         $this->RegisterPropertyInteger('EndOpenVariable', 0);
         $this->RegisterPropertyInteger('EndCloseVariable', 0);
         $this->RegisterPropertyBoolean('RequireEndStops', true);
-        $this->RegisterPropertyInteger('TravelSeconds', 60);
-        $this->RegisterPropertyInteger('ReserveSeconds', 15);
+        $this->RegisterPropertyInteger('MovementTimeoutSeconds', 120); // Harte Obergrenze auch bei Konfigurationsfehler 120 s
+        $this->RegisterPropertyInteger('OpenHoldSeconds', 10);
+        $this->RegisterPropertyInteger('CloseHoldSeconds', 5);
+        $this->RegisterPropertyInteger('BlinkPeriodMs', 1600);
         $this->RegisterPropertyInteger('PulseToleranceSeconds', 3);
         $this->RegisterAttributeInteger('MovementStarted', 0);
+        $this->RegisterAttributeInteger('SignalUntil', 0);
         $this->RegisterAttributeInteger('PulseSentAt', 0);
         $this->RegisterAttributeInteger('PulseVariable', 0);
         $this->RegisterAttributeBoolean('NeedsStop', false);
@@ -38,6 +41,7 @@ class JVGaragentor extends IPSModuleStrict
             $this->SetValue('Position', self::STOPPED);
         }
         $this->RegisterVariableString('Hinweis', 'Steuerung / Diagnose', [], 1);
+        $this->RegisterVariableInteger('Signal', 'Ampel-Signal', [], 2);
         $this->SetTimerInterval('Monitor', 1000);
         $this->Monitor();
     }
@@ -126,10 +130,10 @@ class JVGaragentor extends IPSModuleStrict
         if ($command === 'STOP') {
             $this->WriteAttributeBoolean('NeedsStop', false);
             $this->WriteAttributeInteger('MovementStarted', 0);
-            $this->SetPosition($this->ResolvedEnd() ?? self::STOPPED);
+            $this->SetStatus($this->ResolvedEnd() ?? self::STOPPED, 0);
         } else {
             $this->WriteAttributeInteger('MovementStarted', time());
-            $this->SetPosition($command === 'AUF' ? self::OPENING : self::CLOSING);
+            $this->SetStatus($command === 'AUF' ? self::OPENING : self::CLOSING, $command === 'AUF' ? 1 : 3);
         }
         $this->SetWarning('');
         return true;
@@ -146,6 +150,12 @@ class JVGaragentor extends IPSModuleStrict
         }
     }
 
+    /**
+     * 1-Sekunden-Überwachung: Endlagen haben Vorrang; 120 Sekunden sind
+     * die absolute maximale Anzeige- und Fahrüberwachungszeit.
+     * Nach Ablauf stoppt die ANZEIGE – keine falsche Annahme, dass die
+     * CS320 den Antrieb tatsächlich gestoppt hat.
+     */
     public function Monitor(): void
     {
         $this->CheckPulse();
@@ -153,39 +163,52 @@ class JVGaragentor extends IPSModuleStrict
         $closed = $this->EndSignal('EndCloseVariable');
         if ($open === true && $closed === true) {
             $this->WriteAttributeInteger('MovementStarted', 0);
-            $this->SetPosition(self::STOPPED);
+            $this->WriteAttributeBoolean('NeedsStop', true);
+            $this->SetStatus(self::STOPPED, 0);
             $this->SetWarning('Fehler: Beide Endlagen sind gleichzeitig aktiv.');
-            $this->Broadcast();
             return;
         }
+
         $position = (string)$this->GetValue('Position');
         if (($position === self::OPENING && $open === true) ||
             ($position === self::CLOSING && $closed === true)) {
             $this->Arrived($position === self::OPENING ? 'AUF' : 'ZU');
             return;
         }
-        // Endlagen sind auch nach Neustart / manueller CS320-Bedienung maßgeblich.
-        if ($position !== self::OPENING && $position !== self::CLOSING) {
-            $resolved = $this->ResolvedEnd();
-            if ($resolved !== null && $resolved !== $position) {
-                $this->Arrived($resolved);
-            } elseif (($position === 'AUF' && $open === false) ||
-                      ($position === 'ZU' && $closed === false)) {
-                $this->SetPosition(self::STOPPED);
+        if ($position === self::OPENING || $position === self::CLOSING) {
+            $started = $this->ReadAttributeInteger('MovementStarted');
+            if ($started <= 0 || time() - $started >= $this->MovementTimeout()) {
+                $this->WriteAttributeInteger('MovementStarted', 0);
+                $this->WriteAttributeBoolean('NeedsStop', true);
+                $this->SetStatus(self::STOPPED, 0);
+                $this->SetWarning('120-s-Maximum bzw. konfigurierter Timeout erreicht. Endlage nicht bestätigt – Torstillstand nicht nachgewiesen. Vor weiterer Fahrt STOP drücken.');
             }
             $this->Broadcast();
             return;
         }
-        $started = $this->ReadAttributeInteger('MovementStarted');
-        $limit = max(5, $this->ReadPropertyInteger('TravelSeconds')) +
-            max(1, $this->ReadPropertyInteger('ReserveSeconds'));
-        if ($started <= 0 || (time() - $started) >= $limit) {
-            $this->WriteAttributeInteger('MovementStarted', 0);
-            $this->SetPosition(self::STOPPED);
-            $this->WriteAttributeBoolean('NeedsStop', true);
-            $this->SetWarning('Endlage nicht rechtzeitig bestätigt: Zwischenposition / Stopp angenommen. Vor weiterer Fahrt STOP drücken.');
+
+        // Auch Endlagen durch die CS320 (ohne Shelly-Fahrt) beachten.
+        $resolved = $this->ResolvedEnd();
+        if ($resolved !== null && $resolved !== $position) {
+            $this->Arrived($resolved);
+        } elseif (($position === 'AUF' && $open === false) ||
+                  ($position === 'ZU' && $closed === false)) {
+            $this->SetStatus(self::STOPPED, 0);
+        } elseif (in_array($position, ['AUF', 'ZU'], true)) {
+            // Nachleuchten zeitgesteuert beenden, Status aber beibehalten.
+            $until = $this->ReadAttributeInteger('SignalUntil');
+            if ((int)$this->GetValue('Signal') !== 0 && ($until <= 0 || time() >= $until)) {
+                $this->SetStatus($position, 0);
+            }
+        } elseif ((int)$this->GetValue('Signal') !== 0) {
+            $this->SetStatus(self::STOPPED, 0);
         }
         $this->Broadcast();
+    }
+
+    private function MovementTimeout(): int
+    {
+        return min(120, max(5, $this->ReadPropertyInteger('MovementTimeoutSeconds')));
     }
 
     private function CheckPulse(): void
@@ -221,16 +244,29 @@ class JVGaragentor extends IPSModuleStrict
     {
         $this->WriteAttributeBoolean('NeedsStop', false);
         $this->WriteAttributeInteger('MovementStarted', 0);
-        $this->SetPosition($position);
         $this->SetWarning('');
+        $seconds = $position === 'AUF' ? $this->ReadPropertyInteger('OpenHoldSeconds')
+            : $this->ReadPropertyInteger('CloseHoldSeconds');
+        $seconds = min(120, max(0, $seconds));
+        $signal = $seconds <= 0 ? 0 : ($position === 'AUF' ? 2 : 4);
+        $this->SetStatus($position, $signal, $seconds > 0 ? time() + $seconds : 0);
     }
 
-    private function SetPosition(string $position): void
+    /**
+     * Genau ein kanonischer Signalwert für HTML-Kachel und externes
+     * Ampel-Modul: 0 AUS, 1 gelb pulsierend, 2 grün, 3 rot pulsierend,
+     * 4 rot statisch. Im Ruhezustand bleibt die POSITION sichtbar.
+     */
+    private function SetStatus(string $position, int $signal, int $until = 0): void
     {
+        $this->WriteAttributeInteger('SignalUntil', $until);
         if ((string)$this->GetValue('Position') !== $position) {
             $this->SetValue('Position', $position);
-            $this->Broadcast();
         }
+        if ((int)$this->GetValue('Signal') !== $signal) {
+            $this->SetValue('Signal', $signal);
+        }
+        $this->Broadcast();
     }
 
     private function SetWarning(string $warning): void
@@ -290,8 +326,19 @@ class JVGaragentor extends IPSModuleStrict
             ($this->EndSignal('EndOpenVariable') === null || $this->EndSignal('EndCloseVariable') === null);
         $diagnostic = (string)$this->GetValue('Hinweis');
         if ($requiredEndStopsMissing && $diagnostic === '') $diagnostic = 'Endlagen fehlen – Fahrbefehle gesperrt.';
+        $signal = (int)$this->GetValue('Signal');
+        $deadline = 0;
+        if (in_array($signal, [1, 3], true)) {
+            $started = $this->ReadAttributeInteger('MovementStarted');
+            $deadline = $started > 0 ? $started + $this->MovementTimeout() : 0;
+        } elseif (in_array($signal, [2, 4], true)) {
+            $deadline = $this->ReadAttributeInteger('SignalUntil');
+        }
         return [
             'position' => (string)$this->GetValue('Position'),
+            'signal' => $signal,
+            'effectUntil' => $deadline,
+            'blinkPeriodMs' => min(4000, max(500, $this->ReadPropertyInteger('BlinkPeriodMs'))),
             'warning' => $diagnostic,
             'enabled' => $this->ReadPropertyBoolean('EnableControl'),
             'ready' => !$requiredEndStopsMissing && !$this->ReadAttributeBoolean('NeedsStop'),

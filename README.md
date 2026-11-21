@@ -1,4 +1,4 @@
-# JV Garagentor v1.1.0 – IP-Symcon 9.0
+# JV Garagentor v1.1.1 – IP-Symcon 9.0
 
 Eigenständige IP-Symcon-Bibliothek mit **zwei getrennten Gerätemodulen**:
 
@@ -17,7 +17,7 @@ Die Architektur wurde anhand der Schiebetor-Skripte und der Visualisierungsverkn
 | Untere Endlage bestätigt | `ZU` | 4 | Preset 4: rot statisch | **Rot leuchtend** | **5 s** |
 | STOP, Timeout oder abgelaufene Nachleuchtzeit | `GESTOPPT` bzw. weiter `AUF` oder `ZU` | 0 | WLED **AUS** | **Neutral, keine Beleuchtung** | Sofort bzw. nach Ablauf |
 
-**Alle Zeiten werden in der JVGaragentor-Instanz bearbeitet:**
+**Alle Zeiten werden ausschließlich in der JVGaragentor-Torsteuerungsinstanz bearbeitet** (nicht in JVAmpel):
 
 - `MovementTimeoutSeconds`: Default **120 Sekunden**, 5–120 Sekunden; eine Konfiguration oberhalb 120 wird im Code auf 120 begrenzt.
 - `OpenHoldSeconds`: Default **10 Sekunden**, 0–120 Sekunden.
@@ -36,7 +36,7 @@ Die Tor-Instanz besitzt dazu eine zusätzliche Integer-Variable **„Ampel-Signa
 2. Die Geräteinstanzen **JVGaragentor** und **JVAmpel** anlegen bzw. bestehende Instanzen übernehmen.
 3. **JVGaragentor:** Shelly-Variablen kontrollieren, **beide tatsächlichen Endlagenrückmeldungen** zuweisen und die Laufzeit-/Nachleuchtzeiten einstellen. Die Toransteuerung ist standardmäßig gesperrt.
 4. **JVGaragentor-Kachel:** In die Symcon-Kachelvisualisierung einbinden. Linke Spalte: große AUF-/STOP-/ZU-Tasten; rechte Spalte: Status und synchron zur Ampel animierter Farbhintergrund.
-5. **JVAmpel:** Als Eingang unbedingt die **neue Integer-Variable „Ampel-Signal“** der JVGaragentor-Instanz auswählen. Das ist **nicht** die String-Variable „Position“. Beim Upgrade von v1.0.0 diese neue Zuordnung manuell setzen.
+5. **JVAmpel:** Das Modul verbindet sich **automatisch** mit der Integer-Variable „Ampel-Signal“ der Torsteuerung, wenn genau **eine** JVGaragentor-Torinstanz vorhanden ist. Ein leerer manueller Eingang bedeutet **automatische Erkennung**, kein Fehler. Bei mehreren Torinstanzen muss die gewünschte Integer-Variable ausdrücklich ausgewählt werden. Die String-Variable „Position“ ist nicht geeignet.
 6. WLED-Ausgänge prüfen: vorne Presets **#46199**, Ein/Aus **#29605**. Den hinteren Controller nicht doppelt ansteuern, da er über WLED-Synchronisierung folgt. **Vor Freigabe prüfen, ob alle vier Preset-/Effektwechsel auch hinten ankommen.**
 7. Nach realem Prüfablauf für Ampel und Tor **getrennt** die Automatikfreigaben setzen. Bis dahin beide deaktiviert lassen.
 
@@ -91,3 +91,12 @@ node tests/visual_mock.js
 ```
 
 GitHub Actions prüft zusätzlich JSON und die JavaScript-Syntax. Reale Endlagen, Controller-Verfügbarkeit, WLED-Preset-Synchronisierung und die elektrische Sicherheit müssen vor dem Echtbetrieb vor Ort geprüft werden.
+
+## Automatische Konfiguration (v1.1.1)
+
+- Vorbelegt: Shelly O1 AUF **44228**, O2 ZU **56652**, O3 STOP **55944**, Online **17585**.
+- Vorbelegt: WLED Garage vorne Presets **46199**, Ein/Aus **29605**; hinten synchronisiert geräteseitig.
+- Die **Ampel-Signal-Variable** wird automatisch aus der **einzigen** JVGaragentor-Instanz ermittelt. Ihre Objekt-ID ist erst nach Erstellung dieser Instanz bekannt. Die Verbindung wird auch dann gefunden, wenn die Torinstanz später angelegt wird (10-Sekunden-Timer).
+- Bei mehreren Torinstanzen oder einer bewusst gesetzten, aber ungültigen manuellen Variable erfolgt **keine** automatische Wahl irgendeiner Quelle.
+- **Nicht automatisch belegbar:** Endlage AUF und Endlage ZU – echte, eindeutige Rückmeldungen der CS320 fehlen bisher; Standard-Sicherheitssperre bleibt aktiv. Fahrbefehle erst nach realer Prüfung freigeben.
+- **Keine Doppelung der Zeiten:** 120/10/5 Sekunden und Smartphone-Puls stehen im Konfigurationsformular von **JVGaragentor (Torsteuerung)**. JVAmpel hat keine eigenen Zeitwerte.

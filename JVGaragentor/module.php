@@ -222,6 +222,7 @@ class JVGaragentor extends IPSModuleStrict
         $this->WriteAttributeBoolean('NeedsStop', false);
         $this->WriteAttributeInteger('MovementStarted', 0);
         $this->SetPosition($position);
+        $this->SetWarning('');
     }
 
     private function SetPosition(string $position): void
@@ -235,7 +236,7 @@ class JVGaragentor extends IPSModuleStrict
     private function SetWarning(string $warning): void
     {
         if ((string)$this->GetValue('Hinweis') !== $warning) {
-                $this->SetValue('Hinweis', $warning);
+            $this->SetValue('Hinweis', $warning);
             $this->Broadcast();
         }
     }

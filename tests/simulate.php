@@ -72,12 +72,19 @@ class IPSModuleStrict {
     public function RegisterTimer(string $name,int $time,string $callback): void {}
     public function SetTimerInterval(string $name,int $time): void {}
     public function SetVisualizationType(int $type): void {}
+    // Reale öffentliche Methode der IPSModuleStrict-Basisklasse. Schützt
+    // gegen einen fatalen Klassenladefehler durch kollidierende Methodennamen.
+    public function SetStatus(int $status): bool { return true; }
     public function UpdateVisualizationValue(string $value): bool {$this->sent[]=$value; return true;}
     public function SendDebug(string $name,string $data,int $fmt): void {}
     public function RegisterMessage(int $id,int $msg): void {$this->messages[$id]=$msg;}
     public function UnregisterMessage(int $id,int $msg): void {unset($this->messages[$id]);}
 }
 require __DIR__.'/../JVGaragentor/module.php';
+if (!class_exists(JVGaragentor::class, false)) {
+    throw new RuntimeException('Torsteuerungs-Klasse wurde nicht geladen');
+}
+
 require __DIR__.'/../JVAmpel/module.php';
 $cnt=0;
 function check(bool $ok,string $what): void {global $cnt;$cnt++;if(!$ok)throw new RuntimeException("FAIL $cnt: $what");}

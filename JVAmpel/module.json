@@ -1,0 +1,14 @@
+{
+  "id": "{AF82C291-662E-46F8-99AE-3CD478B1EB5D}",
+  "name": "JVAmpel",
+  "type": 3,
+  "vendor": "JV",
+  "aliases": [
+    "JV Garagentor Ampelsteuerung"
+  ],
+  "url": "https://github.com/johannes-veit/JVGaragentor",
+  "parentRequirements": [],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "JVGA"
+}

@@ -120,7 +120,18 @@ class JVAmpel extends IPSModuleStrict
         $presetVar = $this->ReadPropertyInteger('PresetVariable');
         if (!$this->IsVariable($source, VARIABLETYPE_INTEGER) ||
             !$this->IsVariable($presetVar, VARIABLETYPE_INTEGER)) {
-            $this->SetStatusText('Keine gültige Ampel-Signal-Quelle oder WLED-Voreinstellungen. Torinstanz und Verknüpfung prüfen.');
+            // Keine Tor-Statusquelle: keine zuvor signalisierte Fahrt weiter anzeigen.
+            // Nur aktiv, wenn die Ampelautomatik ausdrücklich eingeschaltet ist.
+            $powerID = $this->ReadPropertyInteger('PowerVariable');
+            if ($this->IsVariable($powerID, VARIABLETYPE_BOOLEAN) && GetValueBoolean($powerID)) {
+                try {
+                    RequestAction($powerID, false);
+                } catch (Throwable $e) {
+                    $this->SetStatusText('Fehler beim Ausschalten nach Signalverlust: ' . $e->getMessage());
+                    return;
+                }
+            }
+            $this->SetStatusText('Ampel AUS: Signalquelle oder WLED-Voreinstellungen fehlen. Torinstanz und Verknüpfung prüfen.');
             return;
         }
         $signal = GetValueInteger($source);

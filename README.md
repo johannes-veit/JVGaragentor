@@ -27,6 +27,22 @@ Die Kachel folgt der großen Symcon-Schiebetor-Bedienansicht: AUF oben links, ST
 
 Kein Status `UNBEKANNT`. Der letzte Fahrbefehl bleibt bis zur Endlagenmeldung bzw. bis zum Ablauf der Überwachungszeit sichtbar.
 
+## Zwei voneinander unabhängige Bausteine
+
+- **JVGaragentor:** Shelly-Impulsbefehle AUF/STOP/ZU sowie Positionsstatus. Keine direkte WLED-Ansteuerung.
+- **JVAmpel:** beobachtet ausschließlich die Positions-Stringvariable des Tor-Moduls und schaltet bis zu zwei WLED-Master-Presetvariablen. Keine Steuerbefehle an Tor oder CS320.
+
+**WLED Master:** Nach Discovery das Gerät erstellen und in der Master-Instanz **Presets anzeigen** aktivieren. Anschließend in JVAmpel die Integer-Variablen `Presets` beider Master-Instanzen zuweisen. Standard-Presets: 1 = öffnet (gelb pulsierend), 2 = offen (grün), 3 = schließt (rot pulsierend), 4 = geschlossen (rot). Bei `GESTOPPT` ist zunächst rot statisch (4) konfiguriert; eine eigene fünfte STOP-/Zwischenpositionsanzeige kann nach Abstimmung ergänzt werden. `EnableAmpel` ist standardmäßig **AUS**.
+
+**LCN GT2 künftig:** kurzer Tastendruck = ZU, langer Tastendruck = AUF. Beide LCN-Ereignisse sollen direkt denselben zentralen Kommandoeingang des Tor-Moduls verwenden wie die Kachel:
+
+```php
+IPS_RequestAction($garagentorInstanzID, 'Command', 'ZU');  // GT2 kurz
+IPS_RequestAction($garagentorInstanzID, 'Command', 'AUF'); // GT2 lang
+```
+
+Der GT2 wird noch nicht automatisch verbunden. Eine mögliche Reaktion während laufender Fahrt und die Gefahrenbereiche sind vor Inbetriebnahme mit der CS320 zu prüfen.
+
 ## Konfiguration
 
 1. Nach Installation als **Geräteinstanz** das Modul **JVGaragentor** anlegen.
@@ -40,4 +56,4 @@ Kein Status `UNBEKANNT`. Der letzte Fahrbefehl bleibt bis zur Endlagenmeldung bz
 
 ## Entwicklungsstand
 
-Version `0.1` enthält Modulgerüst, Bedienkachel, Zustandslogik, Shelly-Schaltaktionen mit Schutzfreigabe und Online-Prüfung. Eine Überprüfung auf einer laufenden SymBox und am realen Tor steht aus. Entwicklung erfolgt im Branch `feature/garagentor-v0.1`. `main` bleibt vorerst unverändert.
+Version `0.1` enthält Tor-Modul und separat installierbares Ampel-Modul, Bedienkachel, Zustandslogik, Shelly-Schaltaktionen mit Schutzfreigabe und Online-Prüfung. Eine Überprüfung auf einer laufenden SymBox und am realen Tor steht aus. Entwicklung erfolgt im Branch `feature/garagentor-v0.1`. `main` bleibt vorerst unverändert.

@@ -270,6 +270,8 @@ $GLOBALS['simGateInstances'] = [];
 $ampelAuto->Sync();
 check($ampelAuto->attrs['SubscribedVariable'] === 0,
     'Bei entferntem Tor wird die automatische Verknüpfung aufgehoben');
+check($GLOBALS['simVars'][29605]['value'] === false,
+    'Verlust der Tor-Signalquelle schaltet WLED als Fehlersicherung aus');
 $GLOBALS['simGateInstances'] = [21001, 21002];
 $GLOBALS['simGateSignals'][21002] = 80005;
 mkVar(80005, VARIABLETYPE_INTEGER, 0, false);

@@ -9,12 +9,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: PHP syntax
-        run: php -l JVGaragentor/module.php
+        run: |
+          php -l JVGaragentor/module.php
+          php -l JVAmpel/module.php
       - name: JSON syntax
         run: |
           python3 -m json.tool library.json >/dev/null
           python3 -m json.tool JVGaragentor/module.json >/dev/null
           python3 -m json.tool JVGaragentor/form.json >/dev/null
+          python3 -m json.tool JVAmpel/module.json >/dev/null
+          python3 -m json.tool JVAmpel/form.json >/dev/null
       - name: HTML SDK essentials
         run: |
           grep -q 'function handleMessage' JVGaragentor/module.html

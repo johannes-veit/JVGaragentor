@@ -1,0 +1,57 @@
+{
+  "elements": [
+    {
+      "type": "Label",
+      "caption": "Version 0.1 – Testbetrieb. Solange 'Toransteuerung aktivieren' nicht markiert ist, werden keine Shelly-Befehle gesendet."
+    },
+    {
+      "type": "CheckBox",
+      "name": "EnableControl",
+      "caption": "Toransteuerung aktivieren (erst nach Prüfung von Verdrahtung und Schaltlogik)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "RelayOpenVariable",
+      "caption": "Shelly Pro 3 – Relais AUF (Boolean, Impuls EIN)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "RelayCloseVariable",
+      "caption": "Shelly Pro 3 – Relais ZU (Boolean, Impuls EIN)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "RelayStopVariable",
+      "caption": "Shelly Pro 3 – Relais STOP (Boolean, Impuls AUS)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "EndOpenVariable",
+      "caption": "Endlage AUF – Boolean-Rückmeldung (optional)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "EndCloseVariable",
+      "caption": "Endlage ZU – Boolean-Rückmeldung (optional)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "TravelSeconds",
+      "caption": "Maximale Torlaufzeit ab Fahrbefehl (Sekunden)",
+      "minimum": 5,
+      "maximum": 300
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "ReserveSeconds",
+      "caption": "Laufzeitreserve (Sekunden)",
+      "minimum": 1,
+      "maximum": 120
+    },
+    {
+      "type": "Label",
+      "caption": "Die Endlagenvariablen müssen bei erreichter Endlage TRUE liefern. Bei abgelaufener Zeit ohne Endlagenmeldung erscheint GESTOPPT; das beweist keinen Stillstand."
+    }
+  ],
+  "actions": []
+}

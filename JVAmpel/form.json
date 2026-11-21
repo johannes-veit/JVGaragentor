@@ -16,28 +16,23 @@
     },
     {
       "type": "SelectVariable",
-      "name": "PresetVariable1",
-      "caption": "WLED Master 1 – Presets (Integer-Variable)"
-    },
-    {
-      "type": "SelectVariable",
-      "name": "PresetVariable2",
-      "caption": "WLED Master 2 – Presets (Integer-Variable, optional)"
+      "name": "PresetVariable",
+      "caption": "WLED Garage vorne – Voreinstellungen (ID 46199)"
     },
     {
       "type": "NumberSpinner",
       "name": "StopPreset",
-      "caption": "Preset bei GESTOPPT (0 = nicht wechseln)",
+      "caption": "Bei GESTOPPT: 0 = Preset unverändert lassen; 1–4 = vorhandenes Preset wählen",
       "minimum": 0,
-      "maximum": 250
+      "maximum": 4
     },
     {
       "type": "Label",
-      "caption": "Standard: 1 = öffnet (gelb pulsierend), 2 = offen (grün), 3 = schließt (rot pulsierend), 4 = geschlossen (rot). STOP wird vorerst als rot statisch (4) dargestellt. Sicherlich kein Nachweis für Torposition."
+      "caption": "Voreinstellungen: 1=Tor öffnen, 2=Tor vollständig geöffnet, 3=Tor schließen, 4=Tor vollständig geschlossen. 0 und 5 sind kein Ampel-Preset. Bei GESTOPPT standardmäßig keine Änderung."
     },
     {
       "type": "Label",
-      "caption": "Die WLED Master-Option 'Presets anzeigen' muss aktiviert sein. Erst dann erscheint eine passende Integer-Variable."
+      "caption": "Ein WLED-Master reicht: die Synchronisierung von Garage vorne zu Garage hinten erfolgt bereits innerhalb WLED. WLED-Voreinstellungen in Instanz 17732 aktivieren."
     }
   ],
   "actions": []

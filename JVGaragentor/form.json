@@ -45,6 +45,10 @@
       "caption": "Fahrbefehle ohne beide Endlagenrückmeldungen sperren (empfohlen)"
     },
     {
+      "type": "Label",
+      "caption": "ZEITEN FÜR TOR UND AMPEL: Alle vier folgenden Werte sind hier editierbar und bereits voreingestellt."
+    },
+    {
       "type": "NumberSpinner",
       "name": "MovementTimeoutSeconds",
       "caption": "Fahr-/Blink-Timeout (Sekunden; max. 120)",

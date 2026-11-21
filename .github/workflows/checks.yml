@@ -1,0 +1,24 @@
+name: JV Garagentor – Checks
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP-Syntax prüfen
+        run: |
+          php -l JVGaragentor/module.php
+          php -l JVAmpel/module.php
+          php -l tests/simulate.php
+      - name: JSON prüfen
+        run: |
+          python3 -m json.tool library.json >/dev/null
+          python3 -m json.tool JVGaragentor/module.json >/dev/null
+          python3 -m json.tool JVGaragentor/form.json >/dev/null
+          python3 -m json.tool JVAmpel/module.json >/dev/null
+          python3 -m json.tool JVAmpel/form.json >/dev/null
+      - name: Simulierte Statuswechsel und Kommandos
+        run: php tests/simulate.php

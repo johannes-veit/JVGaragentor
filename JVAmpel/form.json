@@ -1,0 +1,44 @@
+{
+  "elements": [
+    {
+      "type": "Label",
+      "caption": "Eigenständige Ampelsteuerung. Sendet nur WLED-Presets und niemals Torbefehle."
+    },
+    {
+      "type": "CheckBox",
+      "name": "EnableAmpel",
+      "caption": "Automatische Ampelsteuerung aktivieren (nach Preset-Test)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "PositionVariable",
+      "caption": "Garagentor – Position (Stringvariable aus JVGaragentor)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "PresetVariable1",
+      "caption": "WLED Master 1 – Presets (Integer-Variable)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "PresetVariable2",
+      "caption": "WLED Master 2 – Presets (Integer-Variable, optional)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "StopPreset",
+      "caption": "Preset bei GESTOPPT (0 = nicht wechseln)",
+      "minimum": 0,
+      "maximum": 250
+    },
+    {
+      "type": "Label",
+      "caption": "Standard: 1 = öffnet (gelb pulsierend), 2 = offen (grün), 3 = schließt (rot pulsierend), 4 = geschlossen (rot). STOP wird vorerst als rot statisch (4) dargestellt. Sicherlich kein Nachweis für Torposition."
+    },
+    {
+      "type": "Label",
+      "caption": "Die WLED Master-Option 'Presets anzeigen' muss aktiviert sein. Erst dann erscheint eine passende Integer-Variable."
+    }
+  ],
+  "actions": []
+}

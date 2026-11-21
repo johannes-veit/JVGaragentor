@@ -30,9 +30,18 @@ Kein Status `UNBEKANNT`. Der letzte Fahrbefehl bleibt bis zur Endlagenmeldung bz
 ## Zwei voneinander unabhängige Bausteine
 
 - **JVGaragentor:** Shelly-Impulsbefehle AUF/STOP/ZU sowie Positionsstatus. Keine direkte WLED-Ansteuerung.
-- **JVAmpel:** beobachtet ausschließlich die Positions-Stringvariable des Tor-Moduls und schaltet bis zu zwei WLED-Master-Presetvariablen. Keine Steuerbefehle an Tor oder CS320.
+- **JVAmpel:** beobachtet nur die Positions-Stringvariable und schaltet eine einzige WLED-Voreinstellungsvariable. Keine Steuerbefehle an Tor oder CS320.
 
-**WLED Master:** Nach Discovery das Gerät erstellen und in der Master-Instanz **Presets anzeigen** aktivieren. Anschließend in JVAmpel die Integer-Variablen `Presets` beider Master-Instanzen zuweisen. Standard-Presets: 1 = öffnet (gelb pulsierend), 2 = offen (grün), 3 = schließt (rot pulsierend), 4 = geschlossen (rot). Bei `GESTOPPT` ist zunächst rot statisch (4) konfiguriert; eine eigene fünfte STOP-/Zwischenpositionsanzeige kann nach Abstimmung ergänzt werden. `EnableAmpel` ist standardmäßig **AUS**.
+**WLED Garage vorne:** Master-Instanz `17732`, IP `192.168.103.91`; Variable `Voreinstellungen` (Integer) **`46199`**. Das WLED-Modul erhält seine Preset-Auswahl durch Aktivieren von **Voreinstellungen** in der Master-Instanz. `RequestAction(46199, 1)` wählt Preset 1. IP-Symcon schaltet **nur vorne**; der hintere WLED-Controller (Master-Instanz `31076`, IP `192.168.103.92`) folgt über die bestehende geräteseitige WLED-Synchronisierung. Vor Freigabe prüfen, ob **auch Presetwechsel** synchron übernommen werden (bisher ist Schalt-Synchronisierung bestätigt).
+
+| Wert | WLED-Voreinstellung | Torstatus |
+|---|---|---|
+| 1 | Tor öffnen (gelb pulsierend) | LÄUFT AUF |
+| 2 | Tor vollständig geöffnet (grün dauerhaft) | AUF |
+| 3 | Tor schließen (rot pulsierend) | LÄUFT ZU |
+| 4 | Tor vollständig geschlossen (rot dauerhaft) | ZU |
+
+**Werte 0 und 5 sind in der angezeigten WLED-Variablenliste als „-“ enthalten und werden nicht als Tor-Preset genutzt.** Bei `GESTOPPT` ist die Ampelreaktion noch nicht festgelegt, Standard im Modul ist derzeit **keinen Presetwechsel auslösen**, damit eine Zwischenposition nicht irreführend als „vollständig geschlossen“ erscheint. Vor Produktivbetrieb einen eigenen Signalzustand für STOP/Zwischenposition vereinbaren und an WLED hinterlegen. `EnableAmpel` ist standardmäßig **AUS**. Diese Ampel ist ein Informationssignal und kein Ersatz für Sicherheitseinrichtungen.
 
 **LCN GT2 künftig:** kurzer Tastendruck = ZU, langer Tastendruck = AUF. Beide LCN-Ereignisse sollen direkt denselben zentralen Kommandoeingang des Tor-Moduls verwenden wie die Kachel:
 

@@ -28,6 +28,7 @@ class JVGaragentor extends IPSModuleStrict
         $this->RegisterPropertyInteger('TravelSeconds', 60);
         $this->RegisterPropertyInteger('ReserveSeconds', 15);
         $this->RegisterAttributeInteger('MovementStartedAt', 0);
+        $this->RegisterAttributeBoolean('LastOnline', false);
         $this->RegisterTimer('Monitor', 1000, 'JVG_Monitor($_IPS["TARGET"]);');
         $this->SetVisualizationType(INSTANCE_VISUALIZATION_TYPE_HTML);
     }
@@ -101,6 +102,11 @@ class JVGaragentor extends IPSModuleStrict
 
     public function Monitor(): void
     {
+        $online = $this->IsOnline();
+        if ($online !== $this->ReadAttributeBoolean('LastOnline')) {
+            $this->WriteAttributeBoolean('LastOnline', $online);
+            $this->Broadcast();
+        }
         $position = (string) $this->GetValue('Position');
         $open = $this->EndActive('EndOpenVariable');
         $closed = $this->EndActive('EndCloseVariable');

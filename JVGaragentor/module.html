@@ -24,7 +24,11 @@
 @media (prefers-reduced-motion: reduce) {#jvg-root .jvg-position.jvg-yellow-flash {animation:none;background:#f3d893}#jvg-root .jvg-position.jvg-red-flash{animation:none;background:#efaaa7}}
 
 #jvg-root .jvg-position .jvg-label {left:10%;top:2%;font-size:clamp(15px,11cqw,27px)}
-#jvg-root .jvg-state {white-space:pre-line;overflow-wrap:break-word;font-size:clamp(24px,22cqw,96px);line-height:1.12;padding:2%;}
+/* Status-Text füllt nur die verfügbare Breite der rechten Spalte, nie darüber hinaus.
+   Insbesondere GESTOPPT bleibt auf schmalen Smartphones vollständig lesbar. */
+#jvg-root .jvg-state {width:100%;min-width:0;flex:0 1 100%;white-space:pre-line;overflow-wrap:normal;word-break:normal;text-align:center;font-size:clamp(18px,22cqw,96px);line-height:1.12;padding:0 3%}
+#jvg-root .jvg-state.jvg-state-long {white-space:nowrap;font-size:min(15cqw,54px)}
+#jvg-root .jvg-state.jvg-state-moving {white-space:pre-line;font-size:min(20cqw,70px)}
 #jvg-root .jvg-note {position:absolute;bottom:3%;left:5%;right:5%;font-size:clamp(11px,4.2cqw,16px);line-height:1.25;color:#a22;max-height:17%;overflow:hidden;overflow-wrap:anywhere}
 @media(max-width:500px){#jvg-root {padding:3px}#jvg-root .jvg-grid {gap:7px}#jvg-root .jvg-label{font-size:clamp(13px,3.3vw,21px)}}
 </style>
@@ -62,6 +66,7 @@
   let latest = null;
   let shownSignal = -1;
   const positionCard = root.querySelector('.jvg-position');
+  const positionText = root.querySelector('.jvg-state');
   const effectClasses = ['jvg-yellow-flash','jvg-green','jvg-red-flash','jvg-red'];
   function renderSignal() {
     if (!latest) return;
@@ -83,7 +88,9 @@
     const period = Number(s.blinkPeriodMs || 1600);
     positionCard.style.setProperty('--jvg-blink-ms', Math.min(4000, Math.max(500, period)) + 'ms');
     renderSignal();
-    root.querySelector('.jvg-state').textContent = pos.replace('LÄUFT ', 'LÄUFT\n');
+    positionText.classList.toggle('jvg-state-long', pos === 'GESTOPPT');
+    positionText.classList.toggle('jvg-state-moving', pos.startsWith('LÄUFT '));
+    positionText.textContent = pos.replace('LÄUFT ', 'LÄUFT\n');
     ready = s.enabled === true && s.online === true && s.ready === true;
     const canStop = s.enabled === true && s.online === true;
     const info = !s.enabled ? 'TESTMODUS – Befehle gesperrt' :

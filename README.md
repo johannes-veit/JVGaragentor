@@ -1,4 +1,4 @@
-# JV Garagentor v1.1.3 – IP-Symcon 9.0
+# JV Garagentor v1.2.0 – IP-Symcon 9.0
 
 Eigenständige IP-Symcon-Bibliothek mit **zwei getrennten Gerätemodulen**:
 
@@ -114,3 +114,49 @@ Die interne Zustandsfunktion heißt ab v1.1.2 `UpdateGateState`. Die Testumgebun
 - `LÄUFT AUF` und `LÄUFT ZU` werden über zwei zentrierte Zeilen mit angepasster Schriftgröße angezeigt.
 - `AUF` und `ZU` bleiben bewusst groß. Bestehende Ampel-, Farb-, Zeitschalt- und Shelly-Funktionen wurden nicht verändert.
 - Drei zusätzliche Visualisierungs-Regressionstests prüfen die Schriftklassen und die Breitenbegrenzung.
+
+## LCN-GT2: Zwei Tasten für Garagentor und Schiebetor (v1.2.0)
+
+Die Torinstanz `JVGaragentor` hat nun unten zwei unabhängige Kanäle:
+- **Taste 1 – Garagentor**: LCN-Modul wählen (z. B. M51), die dazugehörige Stringvariable `Host-Kommando → Befehl` wählen, Tastentabelle A/B/C/D, Taste 1–8, Aktion für **Kurz**, **Lang**, **Los** wählen. Voreinstellung **C2**: kurz ZU, lang AUF, los keine Aktion.
+- **Taste 2 – Schiebetor**: eigenes (oder dasselbe) LCN-Modul, eigene Host-Kommando-Variable (bei derselben Quelle dieselbe Variable auswählen), Tastentabelle/Taste sowie Kurz/Lang/Los. Voreinstellung **C1**: kurz ZU, lang AUF, los keine Aktion. Vorhandene Symcon-Skripte AUF #12119, ZU #26612, STOP #29055 sind als Standard aus dem Backup 07.11.2026 vorbelegt. Vor Freigabe aktuellen Objektbaum prüfen.
+
+**Wichtige technische Korrektur:** Ein vollständig unprogrammierter LCN-Taster liefert dem IP-Symcon-LCN-Modul keinen eigenen Tastencode. In LCN-PRO **muss** auf der betreffenden Tastenfunktion ein Host-Kommando eingerichtet werden. Für jede genutzte Taste werden in LCN-PRO (Funktion *Freie Eingabe*, Ziel PCHK Host-ID, meist M004) die passenden `57 XX YY`-SKH-Kommandos hinterlegt. Der Taster benötigt damit **kein Tor als LCN-Ziel**, wohl aber diese reine Meldung an Symcon.
+
+Beispiel für einen GT2 mit C-Tabelle:
+| Taste | Ereignis | LCN-PRO freie Eingabe | Symcon-String `Befehl` |
+|---|---|---|---|
+| C1 | Kurz | `57 21 02` | `033002` |
+| C1 | Lang | `57 21 01` | `033001` |
+| C1 | Los | `57 21 00` | `033000` |
+| C2 | Kurz | `57 22 02` | `034002` |
+| C2 | Lang | `57 22 01` | `034001` |
+| C2 | Los | `57 22 00` | `034000` |
+
+Bei klassischen LCN-Tastentabellen gibt es **A1–A8, B1–B8, C1–C8 und D1–D8**. Beim GT12 verteilen sich zwölf physische Tasten auf mehrere Tabellen, es gibt keine A9–A12.
+
+In Symcon: **LCN Konfigurator → das sendende LCN-Modul → Host-Kommando erstellen**; danach in der Torinstanz dessen Stringvariable `Befehl` auswählen. Die Modulwahl und die Befehl-Variable müssen zum **gleichen** LCN-Modul gehören. Die Software prüft vor der Auslösung die Objekt-Hierarchie. Ein Host-Kommando-Update löst ohne Polling die Auswertung aus. Fremde, fehlerhafte oder mehrdeutige Codes werden ignoriert.
+
+**Diagnose ohne Bewegung:** Die LCN-Zuordnungen zunächst mit beiden Schaltern **deaktiviert** lassen. Trotzdem wird die Stringvariable bei Aktualisierung überwacht. Unter `LCN letzte Tastenmeldung` wird das erkannte Ereignis inklusive Tastenkennung angezeigt, aber noch kein Fahrbefehl gesendet. Erst wenn beide Tasten korrekt zugeordnet, Endanschläge/CS320 und Schutzfunktionen geprüft sind, den jeweiligen LCN-Tastenkanal freigeben.
+
+**Torfahrten:** Garagentor-Kommandos laufen unverändert durch dieselbe `Command()`-Prüfung wie die Smartphone-Kachel (Freigabe, Relais, Online, ggf. Endlagen). Schiebetor-Kommandos starten **ausschließlich** die bisherigen IP-Symcon-Skripte, niemals direkt das Shelly-Relais. Beide Kanäle sind standardmäßig **AUS**; identische Mehrfachmeldungen innerhalb 500 ms werden unterdrückt.
+
+Das LCN-Host-Kommando ist kein zertifizierter Sicherheitseingang. Für Torbewegungen, insbesondere Schließen aus Bereichen ohne Sicht auf das Tor, müssen die CS320 und die Schiebetorsteuerung ihre erforderlichen Sicherheitseinrichtungen eigenständig bereitstellen.
+
+### Freie Eingabe in LCN-PRO
+
+Im normalen Kommandodialog gibt es **keinen** Eintrag „Sende Kommando an Host“. Für SKH muss im Menü **Optionen → Einstellungen → Rechte & Lizenzen** der Administratormodus aktiviert werden. Erst danach steht das Kommando **Freie Eingabe** zur Verfügung. Die Codes `57 XX YY` sind dabei Hex-Bytes. Die Anleitung findest du unter https://wiki.my-gekko.com/de/index/installation_5/lcnlegacy/anhang_1/lcn-tastenpr/lcn-tastenpr.html.
+
+Das normale Kommando **Sende Tasten** ist kein nachgewiesener Ersatz für SKH in der IP-Symcon Host-Kommando-Stringvariablen-Schnittstelle; deshalb wird es von diesem Modul nicht als Eingabe vorausgesetzt.
+
+**GT2-Belegung:** Laut LCN-Installationsanleitung verwendet der GT2 ab Werk eigene Peripherietasten. Zur Bedienung über C1/C2 muss das GT2-Tastenfeld ausdrücklich auf die C-Tabelle umgestellt werden. Bei unveränderter Peripherietasten-Konfiguration müssen die zugehörigen SKH-Codes auf den entsprechenden physischen Tasten parametriert werden. Die Einstellung `C1`/`C2` im JV-Modul beschreibt die per SKH gesendeten Codekennungen und muss nicht zwingend der ursprünglichen Tastentabelle entsprechen.
+
+**Verbindliche Voreinstellung nach deiner LCN-PRO-Aufnahme:** C1 = Schiebetor, C2 = Garagentor. Die beiden Felder werden entsprechend vorausgewählt. Das erste SKH-Kommandofeld für C1 KURZ lautet `57 21 02`. Vor der Auslösung müssen die LCN-Tastenkanäle einzeln explizit aktiviert werden; bis dahin sind die Ereignisse nur zur Diagnose sichtbar.
+
+### Kein myGEKKO notwendig
+
+Die myGEKKO-Seite wird hier **nur als technische Dokumentation** der LCN-SKH-Telegramme genutzt. Das SKH-Telegramm `57 XX YY` ist **kein** an myGEKKO gebundener Befehl. Die LCN-PCHK-Installationsanleitung erklärt, dass die PCHK die an ihre eigene Modul-ID adressierten Befehle an **alle** verbundenen Programme weiterleitet – dazu kann IP-Symcon gehören. Maßgeblich ist deshalb die tatsächliche **LCN-Kopplungs-/Host-ID**, nicht pauschal M004. Siehe https://www.lcn.eu/download/installationsanleitung-lcn-pchk/ und https://community.symcon.de/t/lcn-tastersignale-auswerten/132194?page=2.
+
+Falls zusätzlich eine myGEKKO-Installation mit derselben PCHK verbunden ist, kann diese denselben SKH-Code sehen. Deshalb nur **unbenutzte Codes** festlegen und die Empfänger vor Freigabe testen. Die Beispielcodes C1/C2 sind eine frei vereinbarte Kennung unseres Moduls und werden nicht von LCN automatisch als physische Taste C1/C2 abgeleitet.
+
+Die LCN-Verbindung in der SymBox ist erst dann bestätigt, wenn bei einer realen Betätigung die `Host-Kommando → Befehl`-Stringvariable unter dem **sendenden** LCN-Modul in IP-Symcon aktualisiert wird und unser Diagnosefeld das richtige Ereignis zeigt. Ohne diesen Test keine LCN-Fahrbefehle freigeben.

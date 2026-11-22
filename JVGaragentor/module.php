@@ -1,9 +1,13 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/LCNTasten.php';
+require_once __DIR__ . '/LCNBridge.php';
+
 /** JVGaragentor: Fahrbefehle über Shelly Pro 3; Endlagen-/Laufzeit-Status. */
 class JVGaragentor extends IPSModuleStrict
 {
+    use JVLCNBridgeTrait;
     private const OPENING = 'LÄUFT AUF';
     private const CLOSING = 'LÄUFT ZU';
     private const STOPPED = 'GESTOPPT';
@@ -12,6 +16,7 @@ class JVGaragentor extends IPSModuleStrict
     {
         parent::Create();
         $this->RegisterPropertyBoolean('EnableControl', false);
+        $this->LCNCreate();
         $this->RegisterPropertyInteger('RelayOpenVariable', 44228);
         $this->RegisterPropertyInteger('RelayCloseVariable', 56652);
         $this->RegisterPropertyInteger('RelayStopVariable', 55944);
@@ -44,6 +49,7 @@ class JVGaragentor extends IPSModuleStrict
         $this->RegisterVariableString('Hinweis', 'Steuerung / Diagnose', [], 1);
         $this->RegisterVariableInteger('Signal', 'Ampel-Signal', [], 2);
         $this->SetTimerInterval('Monitor', 1000);
+        $this->LCNApplyChanges();
         $this->Monitor();
     }
 

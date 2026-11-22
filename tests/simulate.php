@@ -10,6 +10,10 @@ $GLOBALS['simActions'] = [];
 $GLOBALS['simNoAction'] = [];
 $GLOBALS['simGateInstances'] = [];
 $GLOBALS['simGateSignals'] = [];
+$GLOBALS['simLCNModules'] = [];
+$GLOBALS['simLCNParents'] = [];
+$GLOBALS['simLCNScripts'] = [12119,26612,29055];
+$GLOBALS['simScriptRuns'] = [];
 function mkVar(int $id, int $type, mixed $value, bool $action = true): void {
     $GLOBALS['simVars'][$id] = ['type'=>$type,'value'=>$value,'action'=>$action];
 }
@@ -17,7 +21,25 @@ function IPS_VariableExists(int $id): bool { return isset($GLOBALS['simVars'][$i
 function IPS_GetInstanceListByModuleID(string $guid): array {
     return $guid === '{8193BC5B-9A6A-48A3-A70C-B69A73472328}' ? $GLOBALS['simGateInstances'] : [];
 }
-function IPS_InstanceExists(int $id): bool { return in_array($id, $GLOBALS['simGateInstances'], true); }
+function IPS_InstanceExists(int $id): bool {
+    return in_array($id, $GLOBALS['simGateInstances'], true) ||
+        in_array($id, $GLOBALS['simLCNModules'], true);
+}
+function IPS_ObjectExists(int $id): bool {
+    return IPS_VariableExists($id) ||
+        in_array($id, $GLOBALS['simLCNModules'], true) ||
+        array_key_exists($id, $GLOBALS['simLCNParents']);
+}
+function IPS_GetParent(int $id): int {
+    return (int)($GLOBALS['simLCNParents'][$id] ?? 0);
+}
+function IPS_ScriptExists(int $id): bool {
+    return in_array($id, $GLOBALS['simLCNScripts'], true);
+}
+function IPS_RunScript(int $id): bool {
+    $GLOBALS['simScriptRuns'][] = $id;
+    return IPS_ScriptExists($id);
+}
 function IPS_GetObjectIDByIdent(string $ident, int $parent): int {
     if ($ident === 'Signal' && array_key_exists($parent, $GLOBALS['simGateSignals'])) {
         return $GLOBALS['simGateSignals'][$parent];
@@ -46,8 +68,10 @@ class IPSModuleStrict {
     public function ApplyChanges(): void {}
     public function RegisterPropertyBoolean(string $name,bool $value): void {$this->props[$name]=$value;}
     public function RegisterPropertyInteger(string $name,int $value): void {$this->props[$name]=$value;}
+    public function RegisterPropertyString(string $name,string $value): void {$this->props[$name]=$value;}
     public function ReadPropertyBoolean(string $name): bool {return (bool)$this->props[$name];}
     public function ReadPropertyInteger(string $name): int {return (int)$this->props[$name];}
+    public function ReadPropertyString(string $name): string {return (string)$this->props[$name];}
     public function RegisterAttributeInteger(string $name,int $value): void {$this->attrs[$name]=$value;}
     public function RegisterAttributeBoolean(string $name,bool $value): void {$this->attrs[$name]=$value;}
     public function RegisterAttributeString(string $name,string $value): void {$this->attrs[$name]=$value;}
@@ -298,5 +322,106 @@ $GLOBALS['simGateInstances'] = [21001];
 $ampelAuto->Sync();
 check($ampelAuto->attrs['SubscribedVariable'] === 80004,
     'Automatische Verbindung nach erneutem Auftauchen der Torinstanz wiederhergestellt');
+
+
+// LCN-SKH-Codec: kurze, lange und Los-Telegramme je Tabelle und Taste.
+check(JVLCNCodec::command('C',1,'KURZ') === '57 21 02','C1 kurz: SKH-Code 57 21 02');
+check(JVLCNCodec::code('C',1,'KURZ') === '033002','C1 kurz: Host-String 033002');
+check(JVLCNCodec::code('C',1,'LANG') === '033001','C1 lang: Host-String 033001');
+check(JVLCNCodec::code('C',1,'LOS') === '033000','C1 los: Host-String 033000');
+check(JVLCNCodec::code('C',2,'KURZ') === '034002','C2 kurz: Host-String 034002');
+check(JVLCNCodec::code('A',8,'KURZ') === '008002','A8 kurz');
+check(JVLCNCodec::code('B',3,'KURZ') === '019002','B3 kurz');
+check(JVLCNCodec::code('D',8,'LANG') === '072001','D8 lang');
+check(JVLCNCodec::code('A',9,'KURZ') === null,'Tastennummer 9 nicht in einzelner Tabelle');
+check(JVLCNCodec::normalize('33002') === '033002','Host-Wert mit verlorener führender Null');
+check(JVLCNCodec::normalize('033002') === '033002','Host-Wert String');
+check(JVLCNCodec::normalize('Befehl 033002') === null,'Beliebige Eingaben abweisen');
+check(JVLCNCodec::normalize('255002') === null,'Unbekannte SKH-Kennung abweisen');
+
+// Die sichtbare Belegung aus LCN-PRO: C1 = SCHIEBETOR, C2 = GARAGENTOR.
+resetHardware();
+$GLOBALS['simLCNModules']=[5010]; // Beispiel M51 als gültig gewählte LCN Modul-Instanz
+$GLOBALS['simLCNParents']=[80101=>5011,5011=>5010,5010=>0];
+mkVar(80101,VARIABLETYPE_STRING,'033002',false);
+$lcnGate = new JVGaragentor();
+$lcnGate->Create();
+$lcnGate->props['LCNGarageModule']=5010;
+$lcnGate->props['LCNGarageHostVariable']=80101;
+$lcnGate->props['LCNSchiebeModule']=5010;
+$lcnGate->props['LCNSchiebeHostVariable']=80101;
+$lcnGate->props['EndOpenVariable']=80001;
+$lcnGate->props['EndCloseVariable']=80002;
+$lcnGate->ApplyChanges();
+check(($lcnGate->messages[80101] ?? 0) === VM_UPDATE,'Ein Host-Update wird für beide Tastenkanäle abonniert');
+check($lcnGate->props['LCNGarageKey']===2 && $lcnGate->props['LCNSchiebeKey']===1,
+    'Voreinstellung gemäß Screenshot: Garage C2, Schiebe C1');
+check($lcnGate->props['LCNGarageEnabled'] === false &&
+    $lcnGate->props['LCNSchiebeEnabled'] === false,'LCN-Tasten ab Werk deaktiviert');
+$actionCount=count($GLOBALS['simActions']);
+$scriptCount=count($GLOBALS['simScriptRuns']);
+check(!$lcnGate->ProcessLCNInput(80101,'033002'),'C1 kurz in Trockenphase');
+check(count($GLOBALS['simActions']) === $actionCount &&
+    count($GLOBALS['simScriptRuns']) === $scriptCount,'Trockenphase schaltet kein Tor');
+check(str_contains($lcnGate->values['LCNActivity'],'TEST:'),'Trockenphase zeigt LCN-Diagnose');
+$form=json_decode($lcnGate->GetConfigurationForm(),true);
+check(is_array($form) && str_contains(json_encode($form), '57 21 02') &&
+    str_contains(json_encode($form), '57 22 01'),'Formular zeigt passende SKH-Kommandos');
+
+$lcnGate->props['LCNGarageEnabled']=true;
+check(!$lcnGate->ProcessLCNInput(80101,'034001'),'LCN-Freigabe ersetzt Torfreigabe nicht');
+$lcnGate->props['EnableControl']=true;
+check($lcnGate->ProcessLCNInput(80101,'034001'),'C2 LANG öffnet Garagentor via Command');
+check(end($GLOBALS['simActions']) === [44228,true],'LCN Garagentor verwendet O1 AUF');
+$GLOBALS['simVars'][44228]['value']=false;
+check(!$lcnGate->ProcessLCNInput(80101,'034001'),'Doppelt empfangenes LCN LANG ignoriert');
+check(count($GLOBALS['simActions']) === $actionCount+1,'Keine doppelte Shelly-Auslösung');
+check(!$lcnGate->ProcessLCNInput(80101,'033002'),'C1 bei abgeschaltetem Schiebetorkanal ohne Aktion');
+
+$lcnGate->props['LCNSchiebeEnabled']=true;
+check($lcnGate->ProcessLCNInput(80101,'033002'),'C1 KURZ startet Schiebetor ZU');
+check(end($GLOBALS['simScriptRuns']) === 26612,'Schiebetor ZU über vorhandenes Skript');
+check($lcnGate->ProcessLCNInput(80101,'033001'),'C1 LANG startet Schiebetor AUF');
+check(end($GLOBALS['simScriptRuns']) === 12119,'Schiebetor AUF über vorhandenes Skript');
+$oldRuns=count($GLOBALS['simScriptRuns']);
+check(!$lcnGate->ProcessLCNInput(80101,'033000'),'C1 LOS hat standardmäßig keine Aktion');
+check(count($GLOBALS['simScriptRuns']) === $oldRuns,'LOS führt keine Torbefehle aus');
+$lcnGate->props['LCNSchiebeRelease']='STOP';
+check($lcnGate->ProcessLCNInput(80101,'033000'),'LOS kann unabhängig STOP zugeordnet werden');
+check(end($GLOBALS['simScriptRuns']) === 29055,'Schiebetor STOP über vorhandenes Skript');
+$lcnGate->props['LCNSchiebeRelease']='NONE';
+
+$lcnGate->props['LCNSchiebeCloseScript']=0;
+$oldRuns=count($GLOBALS['simScriptRuns']);
+check(!$lcnGate->ProcessLCNInput(80101,'033002'),'Fehlendes Schiebetor-Skript sperrt Befehl');
+check(count($GLOBALS['simScriptRuns']) === $oldRuns,'Keine Auslösung bei fehlendem Skript');
+$lcnGate->props['LCNSchiebeCloseScript']=26612;
+
+$lcnGate->props['LCNSchiebeKey']=2;
+$oldActions=count($GLOBALS['simActions']);$oldRuns=count($GLOBALS['simScriptRuns']);
+check(!$lcnGate->ProcessLCNInput(80101,'034002'),'Kollision gleiche Taste blockiert beide Tore');
+check(count($GLOBALS['simActions']) === $oldActions &&
+    count($GLOBALS['simScriptRuns']) === $oldRuns,'Mehrdeutigkeit löst keine Tore aus');
+$lcnGate->props['LCNSchiebeKey']=1;
+
+$GLOBALS['simLCNParents'][80101]=123;
+$oldRuns=count($GLOBALS['simScriptRuns']);
+check(!$lcnGate->ProcessLCNInput(80101,'033002'),'Host-Variable von falschem Modul wird abgewiesen');
+check(count($GLOBALS['simScriptRuns']) === $oldRuns,'Kein Torbefehl bei falscher Modulzuordnung');
+$GLOBALS['simLCNParents'][80101]=5011;
+check(!$lcnGate->ProcessLCNInput(98765,'033002'),'Unbekannte Quellvariable abweisen');
+check(!$lcnGate->ProcessLCNInput(80101,'123abc'),'Fehlerhaftes Telegramm abweisen');
+
+$lcnGate->props['LCNSchiebeEnabled']=false;
+$oldRuns=count($GLOBALS['simScriptRuns']);
+check(!$lcnGate->ProcessLCNInput(80101,'033001'),'Schiebetor LCNTaste separat abschaltbar');
+check(count($GLOBALS['simScriptRuns'])===$oldRuns,'Abschaltung tatsächlich wirksam');
+$lcnGate->props['LCNSchiebeHostVariable']=0;
+$lcnGate->ApplyChanges();
+check(($lcnGate->messages[80101]??0) === VM_UPDATE,
+    'Abo bleibt bei nur einer von zwei gleichen Host-Quellen bestehen');
+$lcnGate->props['LCNGarageHostVariable']=0;
+$lcnGate->ApplyChanges();
+check(!isset($lcnGate->messages[80101]),'Entfernte Host-Quelle wird abgemeldet');
 
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

@@ -2,7 +2,7 @@
   "elements": [
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.1 – Torsteuerung getrennt von der WLED-Ampel. Fahrbefehle erst nach geprüfter Verdrahtung freigeben."
+      "caption": "JV Garagentor v1.2 – Tor, Ampel und optionale zwei LCN-Tasten. LCN-Tasten sind nach dem Update DEAKTIVIERT."
     },
     {
       "type": "CheckBox",
@@ -90,6 +90,339 @@
     {
       "type": "Label",
       "caption": "LCN-GT2 vorbereitet: JVG_Command(GARAGENTOR_INSTANZ_ID, 'ZU') bei kurz, JVG_Command(..., 'AUF') bei lang. Ereignisse erst nach Test zuordnen."
+    },
+    {
+      "type": "Label",
+      "caption": "LCN-TASTEN: Es gibt keinen normalen Menüpunkt 'Sende Kommando an Host'. In LCN-PRO muss für SKH die erweiterte Funktion 'Freie Eingabe' im Administratormodus freigeschaltet werden. Ziel ist die tatsächliche PCHK-Host-ID (häufig M004), nicht das sendende Modul M51. Die beiden LCN-Tastenkanäle bleiben bis zum Diagnose-Test AUS."
+    },
+    {
+      "type": "Label",
+      "caption": "Taste 1 – GARAGENTOR (M51, GT2, Taste C2 aus deiner LCN-PRO-Aufnahme)"
+    },
+    {
+      "type": "CheckBox",
+      "name": "LCNGarageEnabled",
+      "caption": "LCN-Taste Garagentor aktivieren – erst nach trockenem Test"
+    },
+    {
+      "type": "SelectInstance",
+      "name": "LCNGarageModule",
+      "caption": "LCN-Modul mit dieser Taste (z.B. M51)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "LCNGarageHostVariable",
+      "caption": "Host-Kommando → Befehl (String) aus genau diesem Modul",
+      "validVariableTypes": [
+        3
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNGarageTable",
+      "caption": "Tastentabelle GARAGENTOR",
+      "options": [
+        {
+          "value": "A",
+          "caption": "Tabelle A"
+        },
+        {
+          "value": "B",
+          "caption": "Tabelle B"
+        },
+        {
+          "value": "C",
+          "caption": "Tabelle C"
+        },
+        {
+          "value": "D",
+          "caption": "Tabelle D"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNGarageKey",
+      "caption": "Taste GARAGENTOR (1–8 je Tabelle)",
+      "options": [
+        {
+          "value": 1,
+          "caption": "Taste 1"
+        },
+        {
+          "value": 2,
+          "caption": "Taste 2"
+        },
+        {
+          "value": 3,
+          "caption": "Taste 3"
+        },
+        {
+          "value": 4,
+          "caption": "Taste 4"
+        },
+        {
+          "value": 5,
+          "caption": "Taste 5"
+        },
+        {
+          "value": 6,
+          "caption": "Taste 6"
+        },
+        {
+          "value": 7,
+          "caption": "Taste 7"
+        },
+        {
+          "value": 8,
+          "caption": "Taste 8"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNGarageShort",
+      "caption": "Bei KURZ",
+      "options": [
+        {
+          "value": "NONE",
+          "caption": "Keine Aktion"
+        },
+        {
+          "value": "AUF",
+          "caption": "Öffnen"
+        },
+        {
+          "value": "ZU",
+          "caption": "Schließen"
+        },
+        {
+          "value": "STOP",
+          "caption": "Stoppen"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNGarageLong",
+      "caption": "Bei LANG",
+      "options": [
+        {
+          "value": "NONE",
+          "caption": "Keine Aktion"
+        },
+        {
+          "value": "AUF",
+          "caption": "Öffnen"
+        },
+        {
+          "value": "ZU",
+          "caption": "Schließen"
+        },
+        {
+          "value": "STOP",
+          "caption": "Stoppen"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNGarageRelease",
+      "caption": "Bei LOS",
+      "options": [
+        {
+          "value": "NONE",
+          "caption": "Keine Aktion"
+        },
+        {
+          "value": "AUF",
+          "caption": "Öffnen"
+        },
+        {
+          "value": "ZU",
+          "caption": "Schließen"
+        },
+        {
+          "value": "STOP",
+          "caption": "Stoppen"
+        }
+      ]
+    },
+    {
+      "type": "Label",
+      "caption": "Taste 2 – SCHIEBETOR (M51, GT2, Taste C1 aus deiner LCN-PRO-Aufnahme)"
+    },
+    {
+      "type": "CheckBox",
+      "name": "LCNSchiebeEnabled",
+      "caption": "LCN-Taste Schiebetor aktivieren – erst nach trockenem Test"
+    },
+    {
+      "type": "SelectInstance",
+      "name": "LCNSchiebeModule",
+      "caption": "LCN-Modul mit dieser Taste (kann dasselbe sein)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "LCNSchiebeHostVariable",
+      "caption": "Host-Kommando → Befehl (String) aus diesem Modul",
+      "validVariableTypes": [
+        3
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNSchiebeTable",
+      "caption": "Tastentabelle SCHIEBETOR",
+      "options": [
+        {
+          "value": "A",
+          "caption": "Tabelle A"
+        },
+        {
+          "value": "B",
+          "caption": "Tabelle B"
+        },
+        {
+          "value": "C",
+          "caption": "Tabelle C"
+        },
+        {
+          "value": "D",
+          "caption": "Tabelle D"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNSchiebeKey",
+      "caption": "Taste SCHIEBETOR (1–8 je Tabelle)",
+      "options": [
+        {
+          "value": 1,
+          "caption": "Taste 1"
+        },
+        {
+          "value": 2,
+          "caption": "Taste 2"
+        },
+        {
+          "value": 3,
+          "caption": "Taste 3"
+        },
+        {
+          "value": 4,
+          "caption": "Taste 4"
+        },
+        {
+          "value": 5,
+          "caption": "Taste 5"
+        },
+        {
+          "value": 6,
+          "caption": "Taste 6"
+        },
+        {
+          "value": 7,
+          "caption": "Taste 7"
+        },
+        {
+          "value": 8,
+          "caption": "Taste 8"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNSchiebeShort",
+      "caption": "Bei KURZ",
+      "options": [
+        {
+          "value": "NONE",
+          "caption": "Keine Aktion"
+        },
+        {
+          "value": "AUF",
+          "caption": "Öffnen"
+        },
+        {
+          "value": "ZU",
+          "caption": "Schließen"
+        },
+        {
+          "value": "STOP",
+          "caption": "Stoppen"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNSchiebeLong",
+      "caption": "Bei LANG",
+      "options": [
+        {
+          "value": "NONE",
+          "caption": "Keine Aktion"
+        },
+        {
+          "value": "AUF",
+          "caption": "Öffnen"
+        },
+        {
+          "value": "ZU",
+          "caption": "Schließen"
+        },
+        {
+          "value": "STOP",
+          "caption": "Stoppen"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNSchiebeRelease",
+      "caption": "Bei LOS",
+      "options": [
+        {
+          "value": "NONE",
+          "caption": "Keine Aktion"
+        },
+        {
+          "value": "AUF",
+          "caption": "Öffnen"
+        },
+        {
+          "value": "ZU",
+          "caption": "Schließen"
+        },
+        {
+          "value": "STOP",
+          "caption": "Stoppen"
+        }
+      ]
+    },
+    {
+      "type": "Label",
+      "caption": "SCHIEBETOR: Bisherige Aktionsskripte aus deinem SymBox-Backup (07.11.2026). Vor Freigabe in der aktuellen SymBox prüfen; keine direkte zweite Shelly-Ansteuerung."
+    },
+    {
+      "type": "SelectScript",
+      "name": "LCNSchiebeOpenScript",
+      "caption": "Schiebetor AUF – Skript ID 12119"
+    },
+    {
+      "type": "SelectScript",
+      "name": "LCNSchiebeCloseScript",
+      "caption": "Schiebetor ZU – Skript ID 26612"
+    },
+    {
+      "type": "SelectScript",
+      "name": "LCNSchiebeStopScript",
+      "caption": "Schiebetor STOP – Skript ID 29055"
+    },
+    {
+      "type": "Label",
+      "caption": "LCN-PRO: Bei GT2 sind ab Werk eigene Peripherietasten konfiguriert. Die C-Tabelle (C1/C2) ist eine gesondert in LCN-PRO einstellbare Option; nur dann passt unsere Vorauswahl C1/C2. 033002=C1 KURZ, 033001=C1 LANG, 033000=C1 LOS. Tasten 1–8 je A/B/C/D-Tabelle; physische GT12-Tasten 9–12 liegen nicht als C9–C12 vor. Prüfe 'LCN letzte Tastenmeldung' ohne Torfahrten."
     }
   ],
   "actions": []

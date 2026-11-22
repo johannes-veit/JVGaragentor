@@ -93,7 +93,7 @@
     },
     {
       "type": "Label",
-      "caption": "LCN-TASTEN – Zwei getrennte Bedienelemente; kein drittes Symcon-Modul erforderlich. WICHTIG: Ein unprogrammierter LCN-Taster liefert kein Host-Kommando. In LCN-PRO Kurz/Lang/Los als SKH an die PCHK-Host-ID (oft M004) senden und im sendenden Modul die Instanz Host-Kommando anlegen."
+      "caption": "LCN-TASTEN: Es gibt keinen normalen Menüpunkt 'Sende Kommando an Host'. In LCN-PRO muss für SKH die erweiterte Funktion 'Freie Eingabe' im Administratormodus freigeschaltet werden. Ziel ist die tatsächliche PCHK-Host-ID (häufig M004), nicht das sendende Modul M51. Die beiden LCN-Tastenkanäle bleiben bis zum Diagnose-Test AUS."
     },
     {
       "type": "Label",
@@ -422,7 +422,7 @@
     },
     {
       "type": "Label",
-      "caption": "KONFIGURATION: Host-Kommando-String 033002 bedeutet C1 KURZ, 033001 C1 LANG und 033000 C1 LOS. Bei GT2 meist C1/C2. LCN-Tasten müssen per SKH in der LCN-PRO parametriert werden; ohne Tastenziel/Funktion kommt kein sicher auswertbares Host-Kommando. Erst Ereignisse in 'LCN letzte Tastenmeldung' ohne Torfahrt beobachten."
+      "caption": "LCN-PRO: Bei GT2 sind ab Werk eigene Peripherietasten konfiguriert. Die C-Tabelle (C1/C2) ist eine gesondert in LCN-PRO einstellbare Option; nur dann passt unsere Vorauswahl C1/C2. 033002=C1 KURZ, 033001=C1 LANG, 033000=C1 LOS. Tasten 1–8 je A/B/C/D-Tabelle; physische GT12-Tasten 9–12 liegen nicht als C9–C12 vor. Prüfe 'LCN letzte Tastenmeldung' ohne Torfahrten."
     }
   ],
   "actions": []

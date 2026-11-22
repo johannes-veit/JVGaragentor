@@ -367,6 +367,7 @@ check(is_array($form) && str_contains(json_encode($form), '57 21 02') &&
 $lcnGate->props['LCNGarageEnabled']=true;
 check(!$lcnGate->ProcessLCNInput(80101,'033001'),'LCN-Freigabe ersetzt Torfreigabe nicht');
 $lcnGate->props['EnableControl']=true;
+$lcnGate->attrs['LCNLastDispatch']='{}'; // Isolierter Test nach geänderter Torfreigabe.
 check($lcnGate->ProcessLCNInput(80101,'033001'),'C1 LANG öffnet Garagentor via Command');
 check(end($GLOBALS['simActions']) === [44228,true],'LCN Garagentor verwendet O1 AUF');
 $GLOBALS['simVars'][44228]['value']=false;
@@ -413,11 +414,11 @@ $oldRuns=count($GLOBALS['simScriptRuns']);
 check(!$lcnGate->ProcessLCNInput(80101,'034001'),'Schiebetor LCNTaste separat abschaltbar');
 check(count($GLOBALS['simScriptRuns'])===$oldRuns,'Abschaltung tatsächlich wirksam');
 $lcnGate->props['LCNSchiebeHostVariable']=0;
-$lcnGate->LCNApplyChanges();
+$lcnGate->ApplyChanges();
 check(($lcnGate->messages[80101]??0) === VM_UPDATE,
     'Abo bleibt bei Freigabe nur einer von zwei gleichen Host-Quellen bestehen');
 $lcnGate->props['LCNGarageHostVariable']=0;
-$lcnGate->LCNApplyChanges();
+$lcnGate->ApplyChanges();
 check(!isset($lcnGate->messages[80101]),'Entfernte Host-Quelle wird abgemeldet');
 
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

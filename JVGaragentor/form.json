@@ -2,7 +2,11 @@
   "elements": [
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.2 – Tor, Ampel und optionale zwei LCN-Tasten. LCN-Tasten sind nach dem Update DEAKTIVIERT."
+      "caption": "VOREINGESTELLT: beide Tore benutzen dieselbe Host-Instanz 30888 und dieselbe Stringvariable 35739. C1 kurz/lang = Schiebetor ZU/AUF, C2 kurz/lang = Garagentor ZU/AUF. Endlagen sind noch unbekannt und daher nicht vorbelegt."
+    },
+    {
+      "type": "Label",
+      "caption": "JV Garagentor v1.2.1 – LCN-M51 Host-Kommando bereits vorbelegt (Instanz 30888, Befehl 35739). Beide LCN-Tastenkanäle bleiben bis zum Empfangstest ausgeschaltet."
     },
     {
       "type": "CheckBox",
@@ -93,7 +97,7 @@
     },
     {
       "type": "Label",
-      "caption": "LCN-TASTEN: Es gibt keinen normalen Menüpunkt 'Sende Kommando an Host'. In LCN-PRO muss für SKH die erweiterte Funktion 'Freie Eingabe' im Administratormodus freigeschaltet werden. Ziel ist die tatsächliche PCHK-Host-ID (häufig M004), nicht das sendende Modul M51. Die beiden LCN-Tastenkanäle bleiben bis zum Diagnose-Test AUS."
+      "caption": "LCN M51 ist die Kategorie #37682, keine auswählbare Instanz! Die tatsächlich auswählbare Dateninstanz heißt Host-Kommando #30888 und enthält Befehl #35739. Der PCHK-Host hat bestätigt ID4: LCN-PRO-Ziel M4. Beide LCN-Kanäle bleiben bis zum Test AUS."
     },
     {
       "type": "Label",
@@ -107,12 +111,12 @@
     {
       "type": "SelectInstance",
       "name": "LCNGarageModule",
-      "caption": "LCN-Modul mit dieser Taste (z.B. M51)"
+      "caption": "LCN M51 → Host-Kommando-Instanz (30888, NICHT M51-Kategorie 37682)"
     },
     {
       "type": "SelectVariable",
       "name": "LCNGarageHostVariable",
-      "caption": "Host-Kommando → Befehl (String) aus genau diesem Modul",
+      "caption": "LCN M51 → Host-Kommando → Befehl (String 35739)",
       "validVariableTypes": [
         3
       ]
@@ -260,12 +264,12 @@
     {
       "type": "SelectInstance",
       "name": "LCNSchiebeModule",
-      "caption": "LCN-Modul mit dieser Taste (kann dasselbe sein)"
+      "caption": "LCN M51 → Host-Kommando-Instanz (30888, NICHT M51-Kategorie 37682)"
     },
     {
       "type": "SelectVariable",
       "name": "LCNSchiebeHostVariable",
-      "caption": "Host-Kommando → Befehl (String) aus diesem Modul",
+      "caption": "LCN M51 → Host-Kommando → Befehl (String 35739)",
       "validVariableTypes": [
         3
       ]

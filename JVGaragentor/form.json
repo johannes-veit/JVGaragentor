@@ -97,7 +97,7 @@
     },
     {
       "type": "Label",
-      "caption": "Taste 1 – GARAGENTOR (z.B. GT2 auf Modul M51, Taste C1)"
+      "caption": "Taste 1 – GARAGENTOR (M51, GT2, Taste C2 aus deiner LCN-PRO-Aufnahme)"
     },
     {
       "type": "CheckBox",
@@ -250,7 +250,7 @@
     },
     {
       "type": "Label",
-      "caption": "Taste 2 – SCHIEBETOR (z.B. gleiche M51, Taste C2)"
+      "caption": "Taste 2 – SCHIEBETOR (M51, GT2, Taste C1 aus deiner LCN-PRO-Aufnahme)"
     },
     {
       "type": "CheckBox",

@@ -424,4 +424,43 @@ $lcnGate->props['LCNGarageHostVariable']=0;
 $lcnGate->ApplyChanges();
 check(!isset($lcnGate->messages[80101]),'Entfernte Host-Quelle wird abgemeldet');
 
+
+/* Reales Screenshot-Setup M51: Kategorie 37682 -> Host-Kommando 30888 -> Befehl 35739. */
+resetHardware();
+$GLOBALS['simLCNModules'] = [30888];
+$GLOBALS['simLCNParents'] = [35739 => 30888, 30888 => 37682, 37682 => 0];
+mkVar(35739, VARIABLETYPE_STRING, '033002', false);
+$realLCN = new JVGaragentor();
+$realLCN->Create();
+check($realLCN->props['LCNGarageModule'] === 30888 &&
+    $realLCN->props['LCNSchiebeModule'] === 30888,
+    'Neuanlage: beide LCN-Kanäle mit Host-Instanz 30888 vorbelegt');
+check($realLCN->props['LCNGarageHostVariable'] === 35739 &&
+    $realLCN->props['LCNSchiebeHostVariable'] === 35739,
+    'Neuanlage: beide LCN-Kanäle mit Befehl 35739 vorbelegt');
+$realLCN->ApplyChanges();
+check(($realLCN->messages[35739] ?? 0) === VM_UPDATE,
+    'Bekannte Host-Kommando-Variable wird automatisch abonniert');
+check(!$realLCN->ProcessLCNInput(35739, '033002'),
+    'Sicherer Trockenlauf: C1 kurz sendet noch keinen Torbefehl');
+check(str_contains($realLCN->values['LCNActivity'], 'Schiebe') &&
+    str_contains($realLCN->values['LCNActivity'], 'C1 KURZ'),
+    'LCN-Diagnose erfasst physische C1-Kurzmeldung');
+check($realLCN->props['LCNGarageEnabled'] === false &&
+    $realLCN->props['LCNSchiebeEnabled'] === false,
+    'LCN-M51-Voreinstellungen schalten keine Fahrbefehle frei');
+$realLCN->props['LCNGarageModule'] = 0;
+$realLCN->props['LCNSchiebeModule'] = 0;
+$realLCN->props['LCNGarageHostVariable'] = 0;
+$realLCN->props['LCNSchiebeHostVariable'] = 0;
+$realLCN->ApplyChanges();
+check(($realLCN->messages[35739] ?? 0) === VM_UPDATE,
+    'Bestehende Instanz mit alten Nullwerten erkennt bekannte M51-Quelle automatisch');
+check(!$realLCN->ProcessLCNInput(35739, '034001') &&
+    str_contains($realLCN->values['LCNActivity'], 'C2 LANG'),
+    'Automatische Nullwert-Vorbelegung erkennt auch C2 lang');
+$GLOBALS['simLCNParents'][35739] = 1234;
+$realLCN->ApplyChanges();
+check(!isset($realLCN->messages[35739]),
+    'Automatische Quellwahl fällt bei abweichender Elterninstanz sicher weg');
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

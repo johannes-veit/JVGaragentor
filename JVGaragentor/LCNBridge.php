@@ -3,14 +3,40 @@ declare(strict_types=1);
 
 trait JVLCNBridgeTrait
 {
+    /** Objektbaum dieser SymBox: M51 = Kategorie 37682, darunter
+     *  Host-Kommando-Instanz 30888 mit Stringvariable 35739.
+     *  Explizite Auswahlen haben Vorrang. Ohne Auswahl wird nur dieser
+     *  nachprüfbare Vater-Kind-Pfad automatisch übernommen.
+     */
+    private function LCNHostVariable(string $channel): int
+    {
+        $configured = $this->ReadPropertyInteger('LCN' . $channel . 'HostVariable');
+        if ($configured > 0) {
+            return $configured;
+        }
+        return IPS_InstanceExists(30888) &&
+            $this->ValidVariable(35739, VARIABLETYPE_STRING) &&
+            IPS_GetParent(35739) === 30888 ? 35739 : 0;
+    }
+
+    private function LCNHostInstance(string $channel): int
+    {
+        $configured = $this->ReadPropertyInteger('LCN' . $channel . 'Module');
+        if ($configured > 0) {
+            return $configured;
+        }
+        return $this->LCNHostVariable($channel) === 35739 &&
+            IPS_InstanceExists(30888) ? 30888 : 0;
+    }
+
     private function LCNCreate(): void
     {
         // Jede physische Taste kann ein eigenes LCN-Modul haben.
         // Ohne ausdrückliche Freigabe werden niemals Fahrbefehle gesendet.
         foreach (['Garage', 'Schiebe'] as $channel) {
             $this->RegisterPropertyBoolean('LCN' . $channel . 'Enabled', false);
-            $this->RegisterPropertyInteger('LCN' . $channel . 'Module', 0);
-            $this->RegisterPropertyInteger('LCN' . $channel . 'HostVariable', 0);
+            $this->RegisterPropertyInteger('LCN' . $channel . 'Module', 30888);
+            $this->RegisterPropertyInteger('LCN' . $channel . 'HostVariable', 35739);
             $this->RegisterPropertyString('LCN' . $channel . 'Table', 'C');
             $this->RegisterPropertyInteger('LCN' . $channel . 'Key', $channel === 'Garage' ? 2 : 1);
             $this->RegisterPropertyString('LCN' . $channel . 'Short', 'ZU');
@@ -33,7 +59,7 @@ trait JVLCNBridgeTrait
         $old = is_array($old) ? array_map('intval', $old) : [];
         $wanted = [];
         foreach (['Garage', 'Schiebe'] as $channel) {
-            $id = $this->ReadPropertyInteger('LCN' . $channel . 'HostVariable');
+            $id = $this->LCNHostVariable($channel);
             if ($this->ValidVariable($id, VARIABLETYPE_STRING)) {
                 $wanted[] = $id;
             }
@@ -64,8 +90,8 @@ trait JVLCNBridgeTrait
     public function ProcessLCNInput(int $sourceID, string $raw): bool
     {
         $allowed = [
-            'Garage' => $this->ReadPropertyInteger('LCNGarageHostVariable'),
-            'Schiebe' => $this->ReadPropertyInteger('LCNSchiebeHostVariable')
+            'Garage' => $this->LCNHostVariable('Garage'),
+            'Schiebe' => $this->LCNHostVariable('Schiebe')
         ];
         if (!in_array($sourceID, array_values($allowed), true) ||
             !$this->ValidVariable($sourceID, VARIABLETYPE_STRING)) {
@@ -105,7 +131,7 @@ trait JVLCNBridgeTrait
         $hit = $matches[0];
         $channel = $hit['channel'];
         $action = $hit['action'];
-        $moduleID = $this->ReadPropertyInteger('LCN' . $channel . 'Module');
+        $moduleID = $this->LCNHostInstance($channel);
         if (!in_array($action, ['AUF', 'ZU', 'STOP', 'NONE'], true)) {
             $this->RecordLCN('SPERRE: ungültiger Fahrbefehl für ' . $description);
             return false;
@@ -113,7 +139,7 @@ trait JVLCNBridgeTrait
         if ($moduleID <= 0 || !IPS_InstanceExists($moduleID) ||
             !$this->LCNIsSourceOfModule($sourceID, $moduleID)) {
             $this->RecordLCN('SPERRE: Host-Kommando ' . $description .
-                ' liegt nicht unter dem gewählten LCN-Modul (Mxx)');
+                ' liegt nicht unter der gewählten Host-Kommando-Instanz');
             return false;
         }
         if (!$this->ReadPropertyBoolean('LCN' . $channel . 'Enabled')) {
@@ -167,8 +193,9 @@ trait JVLCNBridgeTrait
     }
 
     /**
-     * Die LCN-Host-Kommando-Instanz ist im Objektbaum Kind des sendenden
-     * LCN-Moduls. Nur dessen Befehl darf diesen Tastenkanal auslösen.
+     * Das sendende LCN M51 erscheint in Symcon als Kategorie, die
+     * Host-Kommando-Instanz ist das tatsächlich auswählbare Kind.
+     * Eine Quelle darf nur über ihren überprüften Elternpfad wirken.
      */
     private function LCNIsSourceOfModule(int $variableID, int $moduleID): bool
     {
@@ -207,7 +234,10 @@ trait JVLCNBridgeTrait
                 ' – KURZ: ' . JVLCNCodec::command($table, $key, 'KURZ') .
                 ', LANG: ' . JVLCNCodec::command($table, $key, 'LANG') .
                 ', LOS: ' . JVLCNCodec::command($table, $key, 'LOS') .
-                '. Ziel = Host-ID der LCN-Kopplung (oft M004, prüfen!).'
+                '. LCN-PRO-Ziel = M4 (VISU PCHK-ID 4 ist bestätigt). ' .
+                'Symcon-Quelle: Host-Kommando #' . $this->LCNHostInstance($channel) .
+                ', Befehl #' . $this->LCNHostVariable($channel) .
+                '. Beide LCN-Freigaben bis zum Empfangstest AUS.'
             ];
         }
         return json_encode($form, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';

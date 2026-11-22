@@ -107,10 +107,7 @@
     {
       "type": "SelectInstance",
       "name": "LCNGarageModule",
-      "caption": "LCN-Modul mit dieser Taste (z.B. M51)",
-      "validModules": [
-        "{0E31FED6-E465-4621-95D4-AAF2683C41EC}"
-      ]
+      "caption": "LCN-Modul mit dieser Taste (z.B. M51)"
     },
     {
       "type": "SelectVariable",
@@ -263,10 +260,7 @@
     {
       "type": "SelectInstance",
       "name": "LCNSchiebeModule",
-      "caption": "LCN-Modul mit dieser Taste (kann dasselbe sein)",
-      "validModules": [
-        "{0E31FED6-E465-4621-95D4-AAF2683C41EC}"
-      ]
+      "caption": "LCN-Modul mit dieser Taste (kann dasselbe sein)"
     },
     {
       "type": "SelectVariable",

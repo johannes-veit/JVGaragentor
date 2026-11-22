@@ -1,4 +1,4 @@
-# JV Garagentor v1.2.0 – IP-Symcon 9.0
+# JV Garagentor v1.2.1 – IP-Symcon 9.0
 
 Eigenständige IP-Symcon-Bibliothek mit **zwei getrennten Gerätemodulen**:
 
@@ -160,3 +160,16 @@ Die myGEKKO-Seite wird hier **nur als technische Dokumentation** der LCN-SKH-Tel
 Falls zusätzlich eine myGEKKO-Installation mit derselben PCHK verbunden ist, kann diese denselben SKH-Code sehen. Deshalb nur **unbenutzte Codes** festlegen und die Empfänger vor Freigabe testen. Die Beispielcodes C1/C2 sind eine frei vereinbarte Kennung unseres Moduls und werden nicht von LCN automatisch als physische Taste C1/C2 abgeleitet.
 
 Die LCN-Verbindung in der SymBox ist erst dann bestätigt, wenn bei einer realen Betätigung die `Host-Kommando → Befehl`-Stringvariable unter dem **sendenden** LCN-Modul in IP-Symcon aktualisiert wird und unser Diagnosefeld das richtige Ereignis zeigt. Ohne diesen Test keine LCN-Fahrbefehle freigeben.
+
+## M51 Host-Kommando: korrekte Instanz und Vorbelegung (v1.2.1)
+
+Die **SymBox** zeigt das LCN-Modul M51 nicht als normale auswählbare Geräteinstanz, sondern als **Kategorie** `EG Bad Tür (000,051)` mit ID **37682**. Darin sind bereits enthalten:
+
+- **Host-Kommando**, Typ *LCN Daten*, **Instanz 30888** (diese als Modul-/Quelleninstanz auswählen).
+- **Befehl**, Typ *String*, **Variable 35739** (diese als Ereignisvariable auswählen).
+
+Beide LCN-Kanäle sind für **30888 / 35739** neu vorbelegt. Schon bestehende Torinstanzen mit leeren (0-)Eigenschaften nutzen diese IDs auch ohne manuelles Neusetzen, sofern der tatsächliche Elternpfad bestätigt ist. Eine bewusst anders gewählte gültige ID hat Vorrang. Damit bleibt die Wahl anderer LCN-Module möglich, ohne die vorhandene Konfiguration zu überschreiben.
+
+Die PCHK-ID 4 wurde auf der LCN-VISU unter `192.168.103.60/pchk` vom Nutzer bestätigt. LCN-PRO-Ziel **M4** für beide GT2-Tasten bleibt deshalb korrekt.
+
+**Tastencode nach deiner aktuellen LCN-PRO-Belegung:** C1 Schiebetor (kurz `033002`, lang `033001`), C2 Garagentor (kurz `034002`, lang `034001`). Die Variable **35739** zeigt im zuletzt aufgenommenen Objektbaum den Wert `Nie`; ein reales SKH-Telegramm ist damit noch nicht nachgewiesen. LCN-Tastenfreigaben aus lassen, SKH-Konfiguration an M51 übertragen und danach den GT2 physisch drücken. Erst wenn 35739 den erwarteten sechsstelligen Wert meldet, ist der Empfang bestätigt.

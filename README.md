@@ -142,3 +142,11 @@ In Symcon: **LCN Konfigurator → das sendende LCN-Modul → Host-Kommando erste
 **Torfahrten:** Garagentor-Kommandos laufen unverändert durch dieselbe `Command()`-Prüfung wie die Smartphone-Kachel (Freigabe, Relais, Online, ggf. Endlagen). Schiebetor-Kommandos starten **ausschließlich** die bisherigen IP-Symcon-Skripte, niemals direkt das Shelly-Relais. Beide Kanäle sind standardmäßig **AUS**; identische Mehrfachmeldungen innerhalb 500 ms werden unterdrückt.
 
 Das LCN-Host-Kommando ist kein zertifizierter Sicherheitseingang. Für Torbewegungen, insbesondere Schließen aus Bereichen ohne Sicht auf das Tor, müssen die CS320 und die Schiebetorsteuerung ihre erforderlichen Sicherheitseinrichtungen eigenständig bereitstellen.
+
+### Freie Eingabe in LCN-PRO
+
+Im normalen Kommandodialog gibt es **keinen** Eintrag „Sende Kommando an Host“. Für SKH muss im Menü **Optionen → Einstellungen → Rechte & Lizenzen** der Administratormodus aktiviert werden. Erst danach steht das Kommando **Freie Eingabe** zur Verfügung. Die Codes `57 XX YY` sind dabei Hex-Bytes. Die Anleitung findest du unter https://wiki.my-gekko.com/de/index/installation_5/lcnlegacy/anhang_1/lcn-tastenpr/lcn-tastenpr.html.
+
+Das normale Kommando **Sende Tasten** ist kein nachgewiesener Ersatz für SKH in der IP-Symcon Host-Kommando-Stringvariablen-Schnittstelle; deshalb wird es von diesem Modul nicht als Eingabe vorausgesetzt.
+
+**GT2-Belegung:** Laut LCN-Installationsanleitung verwendet der GT2 ab Werk eigene Peripherietasten. Zur Bedienung über C1/C2 muss das GT2-Tastenfeld ausdrücklich auf die C-Tabelle umgestellt werden. Bei unveränderter Peripherietasten-Konfiguration müssen die zugehörigen SKH-Codes auf den entsprechenden physischen Tasten parametriert werden. Die Einstellung `C1`/`C2` im JV-Modul beschreibt die per SKH gesendeten Codekennungen und muss nicht zwingend der ursprünglichen Tastentabelle entsprechen.

@@ -11,6 +11,8 @@ jobs:
       - name: PHP-Syntax prüfen
         run: |
           php -l JVGaragentor/module.php
+          php -l JVGaragentor/LCNBridge.php
+          php -l JVGaragentor/LCNTasten.php
           php -l JVAmpel/module.php
           php -l tests/simulate.php
       - name: JSON prüfen

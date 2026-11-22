@@ -2,7 +2,7 @@
   "elements": [
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.1 – Torsteuerung getrennt von der WLED-Ampel. Fahrbefehle erst nach geprüfter Verdrahtung freigeben."
+      "caption": "JV Garagentor v1.2 – Tor, Ampel und optionale zwei LCN-Tasten. LCN-Tasten sind nach dem Update DEAKTIVIERT."
     },
     {
       "type": "CheckBox",
@@ -90,6 +90,345 @@
     {
       "type": "Label",
       "caption": "LCN-GT2 vorbereitet: JVG_Command(GARAGENTOR_INSTANZ_ID, 'ZU') bei kurz, JVG_Command(..., 'AUF') bei lang. Ereignisse erst nach Test zuordnen."
+    },
+    {
+      "type": "Label",
+      "caption": "LCN-TASTEN – Zwei getrennte Bedienelemente; kein drittes Symcon-Modul erforderlich. WICHTIG: Ein unprogrammierter LCN-Taster liefert kein Host-Kommando. In LCN-PRO Kurz/Lang/Los als SKH an die PCHK-Host-ID (oft M004) senden und im sendenden Modul die Instanz Host-Kommando anlegen."
+    },
+    {
+      "type": "Label",
+      "caption": "Taste 1 – GARAGENTOR (z.B. GT2 auf Modul M51, Taste C1)"
+    },
+    {
+      "type": "CheckBox",
+      "name": "LCNGarageEnabled",
+      "caption": "LCN-Taste Garagentor aktivieren – erst nach trockenem Test"
+    },
+    {
+      "type": "SelectInstance",
+      "name": "LCNGarageModule",
+      "caption": "LCN-Modul mit dieser Taste (z.B. M51)",
+      "validModules": [
+        "{0E31FED6-E465-4621-95D4-AAF2683C41EC}"
+      ]
+    },
+    {
+      "type": "SelectVariable",
+      "name": "LCNGarageHostVariable",
+      "caption": "Host-Kommando → Befehl (String) aus genau diesem Modul",
+      "validVariableTypes": [
+        3
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNGarageTable",
+      "caption": "Tastentabelle GARAGENTOR",
+      "options": [
+        {
+          "value": "A",
+          "caption": "Tabelle A"
+        },
+        {
+          "value": "B",
+          "caption": "Tabelle B"
+        },
+        {
+          "value": "C",
+          "caption": "Tabelle C"
+        },
+        {
+          "value": "D",
+          "caption": "Tabelle D"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNGarageKey",
+      "caption": "Taste GARAGENTOR (1–8 je Tabelle)",
+      "options": [
+        {
+          "value": 1,
+          "caption": "Taste 1"
+        },
+        {
+          "value": 2,
+          "caption": "Taste 2"
+        },
+        {
+          "value": 3,
+          "caption": "Taste 3"
+        },
+        {
+          "value": 4,
+          "caption": "Taste 4"
+        },
+        {
+          "value": 5,
+          "caption": "Taste 5"
+        },
+        {
+          "value": 6,
+          "caption": "Taste 6"
+        },
+        {
+          "value": 7,
+          "caption": "Taste 7"
+        },
+        {
+          "value": 8,
+          "caption": "Taste 8"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNGarageShort",
+      "caption": "Bei KURZ",
+      "options": [
+        {
+          "value": "NONE",
+          "caption": "Keine Aktion"
+        },
+        {
+          "value": "AUF",
+          "caption": "Öffnen"
+        },
+        {
+          "value": "ZU",
+          "caption": "Schließen"
+        },
+        {
+          "value": "STOP",
+          "caption": "Stoppen"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNGarageLong",
+      "caption": "Bei LANG",
+      "options": [
+        {
+          "value": "NONE",
+          "caption": "Keine Aktion"
+        },
+        {
+          "value": "AUF",
+          "caption": "Öffnen"
+        },
+        {
+          "value": "ZU",
+          "caption": "Schließen"
+        },
+        {
+          "value": "STOP",
+          "caption": "Stoppen"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNGarageRelease",
+      "caption": "Bei LOS",
+      "options": [
+        {
+          "value": "NONE",
+          "caption": "Keine Aktion"
+        },
+        {
+          "value": "AUF",
+          "caption": "Öffnen"
+        },
+        {
+          "value": "ZU",
+          "caption": "Schließen"
+        },
+        {
+          "value": "STOP",
+          "caption": "Stoppen"
+        }
+      ]
+    },
+    {
+      "type": "Label",
+      "caption": "Taste 2 – SCHIEBETOR (z.B. gleiche M51, Taste C2)"
+    },
+    {
+      "type": "CheckBox",
+      "name": "LCNSchiebeEnabled",
+      "caption": "LCN-Taste Schiebetor aktivieren – erst nach trockenem Test"
+    },
+    {
+      "type": "SelectInstance",
+      "name": "LCNSchiebeModule",
+      "caption": "LCN-Modul mit dieser Taste (kann dasselbe sein)",
+      "validModules": [
+        "{0E31FED6-E465-4621-95D4-AAF2683C41EC}"
+      ]
+    },
+    {
+      "type": "SelectVariable",
+      "name": "LCNSchiebeHostVariable",
+      "caption": "Host-Kommando → Befehl (String) aus diesem Modul",
+      "validVariableTypes": [
+        3
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNSchiebeTable",
+      "caption": "Tastentabelle SCHIEBETOR",
+      "options": [
+        {
+          "value": "A",
+          "caption": "Tabelle A"
+        },
+        {
+          "value": "B",
+          "caption": "Tabelle B"
+        },
+        {
+          "value": "C",
+          "caption": "Tabelle C"
+        },
+        {
+          "value": "D",
+          "caption": "Tabelle D"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNSchiebeKey",
+      "caption": "Taste SCHIEBETOR (1–8 je Tabelle)",
+      "options": [
+        {
+          "value": 1,
+          "caption": "Taste 1"
+        },
+        {
+          "value": 2,
+          "caption": "Taste 2"
+        },
+        {
+          "value": 3,
+          "caption": "Taste 3"
+        },
+        {
+          "value": 4,
+          "caption": "Taste 4"
+        },
+        {
+          "value": 5,
+          "caption": "Taste 5"
+        },
+        {
+          "value": 6,
+          "caption": "Taste 6"
+        },
+        {
+          "value": 7,
+          "caption": "Taste 7"
+        },
+        {
+          "value": 8,
+          "caption": "Taste 8"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNSchiebeShort",
+      "caption": "Bei KURZ",
+      "options": [
+        {
+          "value": "NONE",
+          "caption": "Keine Aktion"
+        },
+        {
+          "value": "AUF",
+          "caption": "Öffnen"
+        },
+        {
+          "value": "ZU",
+          "caption": "Schließen"
+        },
+        {
+          "value": "STOP",
+          "caption": "Stoppen"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNSchiebeLong",
+      "caption": "Bei LANG",
+      "options": [
+        {
+          "value": "NONE",
+          "caption": "Keine Aktion"
+        },
+        {
+          "value": "AUF",
+          "caption": "Öffnen"
+        },
+        {
+          "value": "ZU",
+          "caption": "Schließen"
+        },
+        {
+          "value": "STOP",
+          "caption": "Stoppen"
+        }
+      ]
+    },
+    {
+      "type": "Select",
+      "name": "LCNSchiebeRelease",
+      "caption": "Bei LOS",
+      "options": [
+        {
+          "value": "NONE",
+          "caption": "Keine Aktion"
+        },
+        {
+          "value": "AUF",
+          "caption": "Öffnen"
+        },
+        {
+          "value": "ZU",
+          "caption": "Schließen"
+        },
+        {
+          "value": "STOP",
+          "caption": "Stoppen"
+        }
+      ]
+    },
+    {
+      "type": "Label",
+      "caption": "SCHIEBETOR: Bisherige Aktionsskripte aus deinem SymBox-Backup (07.11.2026). Vor Freigabe in der aktuellen SymBox prüfen; keine direkte zweite Shelly-Ansteuerung."
+    },
+    {
+      "type": "SelectScript",
+      "name": "LCNSchiebeOpenScript",
+      "caption": "Schiebetor AUF – Skript ID 12119"
+    },
+    {
+      "type": "SelectScript",
+      "name": "LCNSchiebeCloseScript",
+      "caption": "Schiebetor ZU – Skript ID 26612"
+    },
+    {
+      "type": "SelectScript",
+      "name": "LCNSchiebeStopScript",
+      "caption": "Schiebetor STOP – Skript ID 29055"
+    },
+    {
+      "type": "Label",
+      "caption": "KONFIGURATION: Host-Kommando-String 033002 bedeutet C1 KURZ, 033001 C1 LANG und 033000 C1 LOS. Bei GT2 meist C1/C2. LCN-Tasten müssen per SKH in der LCN-PRO parametriert werden; ohne Tastenziel/Funktion kommt kein sicher auswertbares Host-Kommando. Erst Ereignisse in 'LCN letzte Tastenmeldung' ohne Torfahrt beobachten."
     }
   ],
   "actions": []

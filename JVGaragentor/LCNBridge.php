@@ -12,7 +12,7 @@ trait JVLCNBridgeTrait
             $this->RegisterPropertyInteger('LCN' . $channel . 'Module', 0);
             $this->RegisterPropertyInteger('LCN' . $channel . 'HostVariable', 0);
             $this->RegisterPropertyString('LCN' . $channel . 'Table', 'C');
-            $this->RegisterPropertyInteger('LCN' . $channel . 'Key', $channel === 'Garage' ? 1 : 2);
+            $this->RegisterPropertyInteger('LCN' . $channel . 'Key', $channel === 'Garage' ? 2 : 1);
             $this->RegisterPropertyString('LCN' . $channel . 'Short', 'ZU');
             $this->RegisterPropertyString('LCN' . $channel . 'Long', 'AUF');
             $this->RegisterPropertyString('LCN' . $channel . 'Release', 'NONE');
@@ -144,6 +144,7 @@ trait JVLCNBridgeTrait
             $script = $this->ReadPropertyInteger('LCNSchiebe' .
                 match($action) {'AUF'=>'OpenScript','ZU'=>'CloseScript','STOP'=>'StopScript'});
             if ($script <= 0 || !IPS_ScriptExists($script)) {
+                $this->WriteAttributeString('LCNLastDispatch', '{}');
                 $this->RecordLCN('SPERRE: Schiebetor-Skript für ' . $action .
                     ' ist nicht vorhanden / nicht zugeordnet');
                 return false;
@@ -154,6 +155,11 @@ trait JVLCNBridgeTrait
                 $this->SendDebug('LCN Schiebetor', $e->getMessage(), 0);
                 $ok = false;
             }
+        }
+        if (!$ok) {
+            // Eine nicht ausgeführte Aktion darf einen erneuten Tastendruck
+            // nach Behebung der Störung nicht künstlich blockieren.
+            $this->WriteAttributeString('LCNLastDispatch', '{}');
         }
         $this->RecordLCN($channel . ' ' . $description . ' → ' . $action .
             ($ok ? ' gesendet' : ' NICHT AUSGEFÜHRT'));

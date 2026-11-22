@@ -118,8 +118,8 @@ Die interne Zustandsfunktion heißt ab v1.1.2 `UpdateGateState`. Die Testumgebun
 ## LCN-GT2: Zwei Tasten für Garagentor und Schiebetor (v1.2.0)
 
 Die Torinstanz `JVGaragentor` hat nun unten zwei unabhängige Kanäle:
-- **Taste 1 – Garagentor**: LCN-Modul wählen (z. B. M51), die dazugehörige Stringvariable `Host-Kommando → Befehl` wählen, Tastentabelle A/B/C/D, Taste 1–8, Aktion für **Kurz**, **Lang**, **Los** wählen. Voreinstellung C1: kurz ZU, lang AUF, los keine Aktion.
-- **Taste 2 – Schiebetor**: eigenes (oder dasselbe) LCN-Modul, eigene Host-Kommando-Variable (bei derselben Quelle dieselbe Variable auswählen), Tastentabelle/Taste sowie Kurz/Lang/Los. Voreinstellung C2: kurz ZU, lang AUF, los keine Aktion. Vorhandene Symcon-Skripte AUF #12119, ZU #26612, STOP #29055 sind als Standard aus dem Backup 07.11.2026 vorbelegt. Vor Freigabe aktuellen Objektbaum prüfen.
+- **Taste 1 – Garagentor**: LCN-Modul wählen (z. B. M51), die dazugehörige Stringvariable `Host-Kommando → Befehl` wählen, Tastentabelle A/B/C/D, Taste 1–8, Aktion für **Kurz**, **Lang**, **Los** wählen. Voreinstellung **C2**: kurz ZU, lang AUF, los keine Aktion.
+- **Taste 2 – Schiebetor**: eigenes (oder dasselbe) LCN-Modul, eigene Host-Kommando-Variable (bei derselben Quelle dieselbe Variable auswählen), Tastentabelle/Taste sowie Kurz/Lang/Los. Voreinstellung **C1**: kurz ZU, lang AUF, los keine Aktion. Vorhandene Symcon-Skripte AUF #12119, ZU #26612, STOP #29055 sind als Standard aus dem Backup 07.11.2026 vorbelegt. Vor Freigabe aktuellen Objektbaum prüfen.
 
 **Wichtige technische Korrektur:** Ein vollständig unprogrammierter LCN-Taster liefert dem IP-Symcon-LCN-Modul keinen eigenen Tastencode. In LCN-PRO **muss** auf der betreffenden Tastenfunktion ein Host-Kommando eingerichtet werden. Für jede genutzte Taste werden in LCN-PRO (Funktion *Freie Eingabe*, Ziel PCHK Host-ID, meist M004) die passenden `57 XX YY`-SKH-Kommandos hinterlegt. Der Taster benötigt damit **kein Tor als LCN-Ziel**, wohl aber diese reine Meldung an Symcon.
 
@@ -150,3 +150,5 @@ Im normalen Kommandodialog gibt es **keinen** Eintrag „Sende Kommando an Host�
 Das normale Kommando **Sende Tasten** ist kein nachgewiesener Ersatz für SKH in der IP-Symcon Host-Kommando-Stringvariablen-Schnittstelle; deshalb wird es von diesem Modul nicht als Eingabe vorausgesetzt.
 
 **GT2-Belegung:** Laut LCN-Installationsanleitung verwendet der GT2 ab Werk eigene Peripherietasten. Zur Bedienung über C1/C2 muss das GT2-Tastenfeld ausdrücklich auf die C-Tabelle umgestellt werden. Bei unveränderter Peripherietasten-Konfiguration müssen die zugehörigen SKH-Codes auf den entsprechenden physischen Tasten parametriert werden. Die Einstellung `C1`/`C2` im JV-Modul beschreibt die per SKH gesendeten Codekennungen und muss nicht zwingend der ursprünglichen Tastentabelle entsprechen.
+
+**Verbindliche Voreinstellung nach deiner LCN-PRO-Aufnahme:** C1 = Schiebetor, C2 = Garagentor. Die beiden Felder werden entsprechend vorausgewählt. Das erste SKH-Kommandofeld für C1 KURZ lautet `57 21 02`. Vor der Auslösung müssen die LCN-Tastenkanäle einzeln explizit aktiviert werden; bis dahin sind die Ereignisse nur zur Diagnose sichtbar.

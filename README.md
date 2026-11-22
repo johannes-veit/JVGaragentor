@@ -152,3 +152,11 @@ Das normale Kommando **Sende Tasten** ist kein nachgewiesener Ersatz für SKH in
 **GT2-Belegung:** Laut LCN-Installationsanleitung verwendet der GT2 ab Werk eigene Peripherietasten. Zur Bedienung über C1/C2 muss das GT2-Tastenfeld ausdrücklich auf die C-Tabelle umgestellt werden. Bei unveränderter Peripherietasten-Konfiguration müssen die zugehörigen SKH-Codes auf den entsprechenden physischen Tasten parametriert werden. Die Einstellung `C1`/`C2` im JV-Modul beschreibt die per SKH gesendeten Codekennungen und muss nicht zwingend der ursprünglichen Tastentabelle entsprechen.
 
 **Verbindliche Voreinstellung nach deiner LCN-PRO-Aufnahme:** C1 = Schiebetor, C2 = Garagentor. Die beiden Felder werden entsprechend vorausgewählt. Das erste SKH-Kommandofeld für C1 KURZ lautet `57 21 02`. Vor der Auslösung müssen die LCN-Tastenkanäle einzeln explizit aktiviert werden; bis dahin sind die Ereignisse nur zur Diagnose sichtbar.
+
+### Kein myGEKKO notwendig
+
+Die myGEKKO-Seite wird hier **nur als technische Dokumentation** der LCN-SKH-Telegramme genutzt. Das SKH-Telegramm `57 XX YY` ist **kein** an myGEKKO gebundener Befehl. Die LCN-PCHK-Installationsanleitung erklärt, dass die PCHK die an ihre eigene Modul-ID adressierten Befehle an **alle** verbundenen Programme weiterleitet – dazu kann IP-Symcon gehören. Maßgeblich ist deshalb die tatsächliche **LCN-Kopplungs-/Host-ID**, nicht pauschal M004. Siehe https://www.lcn.eu/download/installationsanleitung-lcn-pchk/ und https://community.symcon.de/t/lcn-tastersignale-auswerten/132194?page=2.
+
+Falls zusätzlich eine myGEKKO-Installation mit derselben PCHK verbunden ist, kann diese denselben SKH-Code sehen. Deshalb nur **unbenutzte Codes** festlegen und die Empfänger vor Freigabe testen. Die Beispielcodes C1/C2 sind eine frei vereinbarte Kennung unseres Moduls und werden nicht von LCN automatisch als physische Taste C1/C2 abgeleitet.
+
+Die LCN-Verbindung in der SymBox ist erst dann bestätigt, wenn bei einer realen Betätigung die `Host-Kommando → Befehl`-Stringvariable unter dem **sendenden** LCN-Modul in IP-Symcon aktualisiert wird und unser Diagnosefeld das richtige Ereignis zeigt. Ohne diesen Test keine LCN-Fahrbefehle freigeben.

@@ -18,6 +18,9 @@ class JVAmpel extends IPSModuleStrict
         $this->RegisterAttributeString('WatchdogSetup', '');
         $this->RegisterAttributeInteger('WatchdogLastSignal', -1);
         $this->RegisterAttributeInteger('WatchdogLastSent', 0);
+        $this->RegisterAttributeInteger('FastObservedSignal', -2);
+        $this->RegisterAttributeBoolean('FastObservedOnline', false);
+        $this->RegisterAttributeInteger('WatchdogStartMs', 0);
         $this->RegisterPropertyInteger('SignalVariable', 0);
         $this->RegisterPropertyInteger('PresetVariable', 46199);
         $this->RegisterPropertyInteger('PowerVariable', 29605);
@@ -31,6 +34,7 @@ class JVAmpel extends IPSModuleStrict
         $this->RegisterAttributeInteger('SubscribedVariable', 0);
         $this->RegisterVariableString('AmpelStatus', 'Ampel-Status', [], 0);
         $this->RegisterTimer('Synchronize', 10000, 'JVGA_Sync($_IPS["TARGET"]);');
+        $this->RegisterTimer('FastSignal', 0, 'JVGA_CheckSignal($_IPS["TARGET"]);');
     }
 
     /**
@@ -117,6 +121,8 @@ class JVAmpel extends IPSModuleStrict
         $this->WriteAttributeInteger('LastRearSignal', -1);
         $this->WriteAttributeInteger('WatchdogLastSignal', -1);
         $this->SetTimerInterval('Synchronize', 10000);
+        $this->SetTimerInterval('FastSignal', $this->ReadPropertyBoolean('EnableAmpel') ? 250 : 0);
+        $this->WriteAttributeInteger('FastObservedSignal', -2);
         $this->Sync();
     }
 
@@ -126,6 +132,18 @@ class JVAmpel extends IPSModuleStrict
             $SenderID === $this->ReadAttributeInteger('SubscribedVariable')) {
             $this->Sync();
         }
+    }
+
+    /** Local-variable fallback only. No extra WLED traffic while the signal is unchanged. */
+    public function CheckSignal(): void
+    {
+        if (!$this->ReadPropertyBoolean('EnableAmpel')) return;
+        $source=$this->ReadAttributeInteger('SubscribedVariable');
+        $raw=$this->IsVariable($source,VARIABLETYPE_INTEGER)?GetValueInteger($source):-1;
+        $onlineID=$this->ReadPropertyInteger('GateOnlineVariable');
+        $online=$this->IsVariable($onlineID,VARIABLETYPE_BOOLEAN)&&GetValueBoolean($onlineID);
+        if ($raw!==$this->ReadAttributeInteger('FastObservedSignal') ||
+            $online!==$this->ReadAttributeBoolean('FastObservedOnline')) $this->Sync();
     }
 
     public function Sync(): void
@@ -144,6 +162,8 @@ class JVAmpel extends IPSModuleStrict
         $note = $validSource && $raw === $signal ? '' : 'Signalquelle ungültig; ';
         $online = $this->ReadPropertyInteger('GateOnlineVariable');
         $gateOnline = $this->IsVariable($online, VARIABLETYPE_BOOLEAN) && GetValueBoolean($online);
+        $this->WriteAttributeInteger('FastObservedSignal',$raw);
+        $this->WriteAttributeBoolean('FastObservedOnline',$gateOnline);
         if (!$gateOnline || !$validSource || $raw !== $signal) {
             // Nach Verlust der Torquelle nicht denselben möglicherweise alten Zustand neu aktivieren.
             $this->WriteAttributeInteger('BlockedGateSignal', $signal > 0 ? $signal : -1);

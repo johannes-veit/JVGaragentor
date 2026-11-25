@@ -605,7 +605,9 @@ check($wd->docs['rear']['info']['leds']['bootps']!==0,'Boot-AUS eingerichtet');
 $wd->Sync();
 $GLOBALS['simVars'][80004]['value']=3;
 $wd->requests=[];$wd->MessageSink(time(),80004,VM_UPDATE,[]);
-check(count($wd->requests)===1&&isset($wd->requests[0]['front'],$wd->requests[0]['rear']),'Signalwechsel ohne vorherigen Poll parallel gesendet');
+check(count($wd->requests)===2&&isset($wd->requests[0]['front'],$wd->requests[0]['rear'])&&$wd->requests[0]['front']['path']==='/json/state','Signalwechsel ohne vorherigen Poll parallel gesendet, danach helle Pulsphase');
+check($wd->requests[0]['front']['body']['tb']===1008 && $wd->requests[1]['front']['body']['tb']===1008 && $wd->requests[1]['rear']['body']['tb']===1008,'Breathe startet auf berechneter heller Phase, auch nach AUS-Reset');
+check(!isset($wd->requests[1]['front']['body']['playlist'])&&!isset($wd->requests[1]['front']['body']['seg']),'Phasenkorrektur verändert weder Effekt noch lokalen Watchdog');
 check($wd->requests[0]['rear']['body']['playlist']['dur']===[50]&&$wd->requests[0]['rear']['body']['tt']===0,'Lokales Ablaufdatum und sofortiger Start');
 $wd->Sync();
 check(str_contains($wd->values['AmpelStatus'],'synchron'),'Beide echten Szenenparameter abgeglichen');
@@ -617,6 +619,16 @@ check($wd->docs['rear']['state']['seg'][0]['fx']===2,'Aktuelle Szene nach Abweic
 $GLOBALS['simVars'][80004]['value']=0;
 $wd->Sync();
 check(!$wd->docs['front']['state']['on']&&!$wd->docs['rear']['state']['on'],'Signal 0 schaltet beide ab');
+$wd->requests=[];$wd->CheckSignal();
+check(count($wd->requests)===0,'Schneller lokaler Signalcheck erzeugt im Ruhezustand keinen WLED-Verkehr');
+$GLOBALS['simVars'][80004]['value']=1;
+$wd->CheckSignal();
+check(isset($wd->requests[0]['front']['body']['seg'])&&$wd->requests[0]['front']['body']['seg'][0]['col'][0]===[255,160,0,0],'Lokaler 250-ms-Fallback startet gelbe Fahrt auch ohne VM_UPDATE');
+$GLOBALS['simVars'][80004]['value']=2;
+$wd->requests=[];$wd->CheckSignal();
+check(count($wd->requests)===1&&!isset($wd->requests[0]['front']['body']['tb']),'Endlage Grün unverzögert statisch ohne Phasenkorrektur');
+$GLOBALS['simVars'][80004]['value']=0;
+$wd->Sync();
 // One-time commissioning of existing garage only, no movement during update.
 resetHardware();
 $GLOBALS['simLCNModules']=[30888];

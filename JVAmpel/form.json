@@ -2,7 +2,7 @@
   "elements": [
     {
       "type": "Label",
-      "caption": "JV Ampel v1.4 – direkte parallele WLED-Ansteuerung und Soll-Ist-Synchronprüfung."
+      "caption": "JV Ampel v1.5 – schneller Start mit heller Pulsphase, parallele Soll-Ist-Prüfung."
     },
     {
       "type": "CheckBox",
@@ -76,7 +76,7 @@
     },
     {
       "type": "Label",
-      "caption": "Direkter Signalwechsel ohne Wartezeit, Kontrolle aktiv ca. 2 s, Ruhe 10 s; Synchronprüfung liest reale JSON-Zustände."
+      "caption": "Direkter Signalwechsel; lokaler 250-ms-Signalcheck ohne zusätzlichen WLED-Verkehr. Helle Startphase für Blink/Breathe/Fade. WLED-Kontrolle aktiv ca. 2 s, Ruhe 10 s."
     }
   ],
   "actions": []

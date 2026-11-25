@@ -213,6 +213,25 @@ trait JVWledWatchdogTrait
             'np'=>true];
     }
 
+    /**
+     * WLED 0.15.0-b7 FX.cpp: Breathe uses 16-bit time*speed and peaks at
+     * counter 8192 after the 5/16 scaling. Fade peaks at raw 32768.
+     * Blink is bright at the start of its cycle. Do not change speed or
+     * colors, and do not substitute a static red/green safety indication.
+     * WLED stateUpdated resets timebase when briT==0; send it again after ON.
+     */
+    private function WdBrightPhase(array $scene): ?int
+    {
+        $seg=$scene['seg'][0]??[];
+        $factor=((int)($seg['sx']??128)>>3)+10;
+        return match((int)($seg['fx']??-1)) {
+            1=>0,
+            2=>intdiv(26215,$factor),
+            12=>intdiv(32768,$factor),
+            default=>null
+        };
+    }
+
     private function WdCurrent(int $source,int $raw): bool
     {
         $online=$this->ReadPropertyInteger('GateOnlineVariable');
@@ -233,9 +252,13 @@ trait JVWledWatchdogTrait
             // Direct signal change: immediately send the scene and lease, in parallel.
             // No pre-flight HTTP poll if identities, slots and scenes were already verified.
             if ($signal>0&&$signal!==$last&&isset($setup['scenes'][$signal],$setup['front'],$setup['rear'])&&$this->WdCurrent($source,$raw)) {
+                $started=microtime(true);
+                $scene=$setup['scenes'][$signal];
+                $phase=in_array($signal,[1,3],true)?$this->WdBrightPhase($scene):null;
+                $phaseBody=$phase===null?[]:['tb'=>$phase];
                 $req=[];
                 foreach (self::WD_DEVICES as $side=>$device) {
-                    $req[$side]=['path'=>'/json/state','body'=>$setup['scenes'][$signal]+['transition'=>0,'tt'=>0]+$this->WdLease($setup[$side])];
+                    $req[$side]=['path'=>'/json/state','body'=>$scene+['transition'=>0,'tt'=>0]+$phaseBody+$this->WdLease($setup[$side])];
                 }
                 $res=$this->WledHttp($req);
                 if (($res['front']['success']??false)!==true||($res['rear']['success']??false)!==true||!$this->WdCurrent($source,$raw)) {
@@ -244,10 +267,20 @@ trait JVWledWatchdogTrait
                     $this->SetStatusText($note.'Signal '.$signal.' – Start nicht beidseitig bestätigt; AUS angefordert');
                     return;
                 }
+                // After cold ON, firmware has applied brightness and may have reset tb.
+                // Align the already active pulse to its bright phase, without restarting
+                // the playlist, changing the effect, or adding a delay to the first packet.
+                if ($phase!==null && $last<=0) {
+                    if (!$this->WdCurrent($source,$raw)) { $this->WdOff([], $setup); return; }
+                    $this->WdBoth('/json/state',['tb'=>$phase,'udpn'=>self::WD_UDP]);
+                    if (!$this->WdCurrent($source,$raw)) { $this->WdOff([], $setup); return; }
+                }
+                $ms=(int)round((microtime(true)-$started)*1000);
+                $this->WriteAttributeInteger('WatchdogStartMs',$ms);
                 $this->WriteAttributeInteger('WatchdogLastSignal',$signal);
                 $this->WriteAttributeInteger('WatchdogLastSent',time());
-                $this->SetStatusText($note.'Signal '.$signal.' – vorne/hinten gleichzeitig angefordert, Prüfung folgt');
-                $this->SetTimerInterval('Synchronize',500);
+                $this->SetStatusText($note.'Signal '.$signal.' – vorne/hinten angefordert ('.$ms.' ms API), Prüfung folgt');
+                $this->SetTimerInterval('Synchronize',250);
                 return;
             }
             $docs=$this->WdBoth('/json/si');
@@ -313,7 +346,7 @@ trait JVWledWatchdogTrait
                 }
                 $this->WriteAttributeInteger('WatchdogLastSent',time());
             }
-            $this->SetStatusText('Signal '.$signal.' – vorne/hinten synchron (Farbe, Effekt, Helligkeit, Watchdog)');
+            $this->SetStatusText('Signal '.$signal.' – vorne/hinten synchron (Farbe, Effekt, Helligkeit, Watchdog) | Start-API '.$this->ReadAttributeInteger('WatchdogStartMs').' ms');
         } catch (Throwable $e) {
             $this->WdOff([],is_array($setup??null)?$setup:[]);
             $this->WriteAttributeString('WatchdogSetup','');

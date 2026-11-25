@@ -49,6 +49,7 @@ trait JVLCNBridgeTrait
         $this->RegisterPropertyInteger('LCNSchiebeCloseScript', 26612);
         $this->RegisterPropertyInteger('LCNSchiebeStopScript', 29055);
         $this->RegisterAttributeBoolean('LCNCommissionDone125', false);
+        $this->RegisterAttributeBoolean('LCNCommissionDone127', false);
         // Execute configuration change outside the instance method, not recursively in ApplyChanges.
         $this->RegisterTimer('LCNCommission125', 0, 'if (JVG_LCNCommissionReady($_IPS["TARGET"])) { $id = $_IPS["TARGET"]; if (!IPS_HasChanges($id) && IPS_SetProperty($id, "EndOpenVariable", 13220) && IPS_SetProperty($id, "EndCloseVariable", 21923) && IPS_SetProperty($id, "RequireEndStops", true) && IPS_SetProperty($id, "LCNGarageEnabled", true)) { IPS_ApplyChanges($id); } }');
         $this->RegisterAttributeString('LCNSubscriptions', '[]');
@@ -71,7 +72,10 @@ trait JVLCNBridgeTrait
         foreach (array_diff($old, $wanted) as $id) {
             $this->UnregisterMessage((int)$id, VM_UPDATE);
         }
-        foreach (array_diff($wanted, $old) as $id) {
+        // The attribute is persistent; message registrations need to be restored
+        // on ApplyChanges even if the saved IDs are unchanged.
+        foreach ($wanted as $id) {
+            $this->UnregisterMessage((int)$id, VM_UPDATE);
             $this->RegisterMessage((int)$id, VM_UPDATE);
         }
         $this->WriteAttributeString('LCNSubscriptions', json_encode($wanted) ?: '[]');
@@ -84,7 +88,7 @@ trait JVLCNBridgeTrait
      */
     private function LCNScheduleCommission(): void
     {
-        if ($this->InstanceID !== 15957 || $this->ReadAttributeBoolean('LCNCommissionDone125')) {
+        if ($this->InstanceID !== 15957 || $this->ReadAttributeBoolean('LCNCommissionDone127')) {
             $this->SetTimerInterval('LCNCommission125', 0);
             return;
         }
@@ -93,11 +97,14 @@ trait JVLCNBridgeTrait
             $this->ReadPropertyBoolean('RequireEndStops') &&
             $this->ReadPropertyInteger('EndOpenVariable') === self::END_OPEN_ID &&
             $this->ReadPropertyInteger('EndCloseVariable') === self::END_CLOSE_ID) {
-            $this->WriteAttributeBoolean('LCNCommissionDone125', true);
+            $this->WriteAttributeBoolean('LCNCommissionDone127', true);
             $this->SetTimerInterval('LCNCommission125', 0);
             return;
         }
-        $this->SetTimerInterval('LCNCommission125', $this->LCNCommissionMappingOK() ? 1000 : 0);
+        $mapped = $this->LCNCommissionMappingOK();
+        $this->SetTimerInterval('LCNCommission125', $mapped ? 1000 : 0);
+        $this->RecordLCN($mapped ? 'C2: automatische Freigabe / ID-Korrektur ausstehend, Tor muss freigegeben und in Endlage sein' :
+            'C2: automatische Freigabe gesperrt – Host, Taste oder Shelly-Zuordnung weicht ab');
     }
 
     private function LCNCommissionMappingOK(): bool
@@ -105,7 +112,7 @@ trait JVLCNBridgeTrait
         if ($this->InstanceID !== 15957 ||
             $this->LCNHostInstance('Garage') !== 30888 || $this->LCNHostVariable('Garage') !== 35739 ||
             !IPS_InstanceExists(30888) || !$this->ValidVariable(35739, VARIABLETYPE_STRING) ||
-            IPS_GetParent(35739) !== 30888 || IPS_GetParent(30888) !== 37682 ||
+            IPS_GetParent(35739) !== 30888 ||
             $this->ReadPropertyString('LCNGarageTable') !== 'C' ||
             $this->ReadPropertyInteger('LCNGarageKey') !== 2 ||
             $this->ReadPropertyString('LCNGarageShort') !== 'ZU' ||
@@ -128,7 +135,7 @@ trait JVLCNBridgeTrait
     /** Called by separate timer; never executes or replays a stored LCN telegram. */
     public function LCNCommissionReady(): bool
     {
-        if ($this->ReadAttributeBoolean('LCNCommissionDone125') || !$this->LCNCommissionMappingOK() ||
+        if ($this->ReadAttributeBoolean('LCNCommissionDone127') || !$this->LCNCommissionMappingOK() ||
             !$this->ReadPropertyBoolean('EnableControl') || !$this->IsOnline() ||
             $this->ReadAttributeBoolean('NeedsStop') || $this->ReadAttributeInteger('MovementStarted') > 0 ||
             GetValueBoolean(44228) || GetValueBoolean(56652) || !GetValueBoolean(55944) ||
@@ -141,7 +148,13 @@ trait JVLCNBridgeTrait
         if ($Message !== VM_UPDATE || !$this->ValidVariable($SenderID, VARIABLETYPE_STRING)) {
             return;
         }
-        $this->ProcessLCNInput($SenderID, GetValueString($SenderID));
+        // VM_UPDATE carries the value of this specific telegram. Reading the
+        // variable again can return the following LOS telegram instead.
+        if (!isset($Data[0]) || !is_string($Data[0])) {
+            $this->RecordLCN('LCN Quelle #' . $SenderID . ': Ereigniswert fehlt/ungültig – kein Fahrbefehl');
+            return;
+        }
+        $this->ProcessLCNInput($SenderID, $Data[0]);
     }
 
     /**
@@ -249,8 +262,9 @@ trait JVLCNBridgeTrait
             // nach Behebung der Störung nicht künstlich blockieren.
             $this->WriteAttributeString('LCNLastDispatch', '{}');
         }
+        $reason = !$ok && $channel === 'Garage' ? (string)$this->GetValue('Hinweis') : '';
         $this->RecordLCN($channel . ' ' . $description . ' → ' . $action .
-            ($ok ? ' gesendet' : ' NICHT AUSGEFÜHRT'));
+            ($ok ? ' gesendet' : ' NICHT AUSGEFÜHRT' . ($reason !== '' ? ': ' . $reason : '')));
         return $ok;
     }
 
@@ -303,8 +317,8 @@ trait JVLCNBridgeTrait
             ];
         }
         if ($this->InstanceID === 15957) {
-            $form['elements'][] = ['type'=>'Label','caption'=>'Einmalige C2-Freigabe v1.2.5: ' .
-                ($this->ReadAttributeBoolean('LCNCommissionDone125') ? 'abgeschlossen; manuelle Freigabe bleibt maßgeblich' :
+            $form['elements'][] = ['type'=>'Label','caption'=>'Einmalige C2-Freigabe / ID-Korrektur v1.2.7: ' .
+                ($this->ReadAttributeBoolean('LCNCommissionDone127') ? 'abgeschlossen; manuelle Freigabe bleibt maßgeblich' :
                     ($this->LCNCommissionMappingOK() ? 'warte auf freigegebenes, erreichbares und in Endlage ruhendes Tor' : 'abweichende Zuordnung – keine automatische Freigabe'))];
         }
         return json_encode($form, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';

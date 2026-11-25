@@ -94,10 +94,11 @@ class JVGaragentor extends IPSModuleStrict
                 $this->SetWarning('Beide Endlagen-Rückmeldungen müssen zugeordnet sein.');
                 return false;
             }
-            if (($this->ReadPropertyInteger('EndOpenVariable') > 0 &&
-                 $this->ReadPropertyInteger('EndOpenVariable') === $this->ReadPropertyInteger('EndCloseVariable')) ||
-                in_array($this->ReadPropertyInteger('EndOpenVariable'), array_values($ids), true) ||
-                in_array($this->ReadPropertyInteger('EndCloseVariable'), array_values($ids), true)) {
+            $openID = $this->EndVariableId('EndOpenVariable');
+            $closeID = $this->EndVariableId('EndCloseVariable');
+            if (($openID > 0 && $openID === $closeID) ||
+                in_array($openID, array_values($ids), true) ||
+                in_array($closeID, array_values($ids), true)) {
                 $this->SetWarning('Endlagenvariablen sind nicht eindeutig / überlappen mit Relais.');
                 return false;
             }
@@ -328,7 +329,12 @@ class JVGaragentor extends IPSModuleStrict
     private function EndVariableId(string $property): int
     {
         $id = $this->ReadPropertyInteger($property);
-        if ($id !== 0) return $id;
+        // Repair only known legacy mistakes on the explicitly commissioned garage.
+        // A different installation or unknown ID is never guessed.
+        $legacy = $this->InstanceID === 15957 &&
+            in_array($id, [0,44228,56652,55944,17585,self::END_OPEN_ID,self::END_CLOSE_ID], true);
+        $expected = $property === 'EndOpenVariable' ? self::END_OPEN_ID : self::END_CLOSE_ID;
+        if ($id === $expected || ($id !== 0 && !$legacy)) return $id;
         $ids = $this->RelayIds();
         if ($ids['AUF'] !== 44228 || $ids['ZU'] !== 56652 || $ids['STOP'] !== 55944 ||
             $this->ReadPropertyInteger('OnlineVariable') !== 17585) return 0;

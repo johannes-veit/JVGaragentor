@@ -6,7 +6,7 @@
     },
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.2.5 – einmalige C2-Freigabe nur für bestätigte Instanz #15957, bei korrekter Zuordnung und ruhendem, bereits freigegebenem Tor."
+      "caption": "JV Garagentor v1.2.7 – C2-Ereigniswert direkt auswerten, bekannte alte Status-/Endlagenverwechslungen bei Instanz #15957 korrigieren."
     },
     {
       "type": "CheckBox",
@@ -51,7 +51,7 @@
     },
     {
       "type": "Label",
-      "caption": "Bestehende Instanz: leere Endlagenfelder (0) werden nur beim bestätigten Shelly #22849 mit passender Relaiszuordnung automatisch ausgewertet. Für sichtbar gespeicherte IDs beide Felder auswählen. Status/Status 1/Status 2 sind ausschließlich Fahrbefehle."
+      "caption": "Bestehende Garage #15957: bekannte falsch gespeicherte Status-/Endlagen-IDs werden nur bei bestätigtem Shelly #22849 korrigiert. Eingangsstatus AUF 13220 / ZU 21923; Status 44228/56652/55944 sind nur Relais."
     },
     {
       "type": "CheckBox",

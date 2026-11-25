@@ -5,13 +5,17 @@
 #jvg-root .jvg-grid {display:grid; width:100%; height:100%; grid-template-columns:minmax(0,2.1fr) minmax(0,1fr); grid-template-rows:minmax(0,1fr) minmax(0,.37fr) minmax(0,1fr); gap:10px}
 #jvg-root .jvg-card {container-type:size;background:#fff; box-shadow:0 1px 5px #0002; border-radius:6px; position:relative; min-width:0; min-height:0; overflow:hidden}
 #jvg-root .jvg-label {position:absolute; top:4%;left:7%; font-size:clamp(16px,2.1vw,29px);font-weight:400;z-index:1;pointer-events:none}
-#jvg-root .jvg-control {width:100%;height:100%;border:0;background:none;margin:0;padding:10% 5% 4%;display:flex;align-items:center;justify-content:center;touch-action:manipulation;cursor:pointer}
-#jvg-root .jvg-circle {display:flex;align-items:center;justify-content:center;aspect-ratio:1;width:min(90%,80cqh);border-radius:50%;background:#00c8ad;box-shadow:inset 0 0 1px #0002}
-#jvg-root .jvg-control svg {width:62%;height:62%;stroke:#fff;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;fill:none}
-#jvg-root .jvg-stop .jvg-circle {width:min(43%,68cqh)}
-#jvg-root .jvg-stop svg {width:63%;height:63%;stroke-width:5}
+/* iOS/WebKit: native buttons must not determine icon position via flex or
+   intrinsic SVG size. The button and SVG viewport are independently fixed
+   to the card. The SVG viewBox keeps the circle square at any tile size. */
+#jvg-root .jvg-control {position:absolute;inset:0;width:100%;height:100%;border:0;background:none;margin:0;padding:0;display:block;-webkit-appearance:none;appearance:none;touch-action:manipulation;cursor:pointer}
+#jvg-root .jvg-control .jvg-icon {position:absolute;display:block;left:9%;top:12%;width:82%;height:82%;max-width:none;max-height:none;pointer-events:none;overflow:visible;transform-origin:50% 50%}
+#jvg-root .jvg-icon-bg {fill:#00c8ad;stroke:none}
+#jvg-root .jvg-icon-mark {stroke:#fff;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;fill:none}
+#jvg-root .jvg-stop .jvg-icon {left:30.65%;top:22%;width:38.7%;height:68%}
+#jvg-root .jvg-stop .jvg-icon-mark {stroke-width:5}
 #jvg-root .jvg-control:focus-visible {outline:4px solid #1467aa;outline-offset:-6px}
-#jvg-root .jvg-control:active .jvg-circle {transform:scale(.97)}
+#jvg-root .jvg-control:active .jvg-icon {transform:scale(.97)}
 #jvg-root .jvg-control:disabled {opacity:.45;cursor:not-allowed}
 #jvg-root .jvg-position {grid-column:2;grid-row:1/4;display:flex;align-items:center;justify-content:center;text-align:center;container-type:inline-size;transition:background-color .15s ease;background:#fff}
 /* Sanfte, kontrastreiche Statusbeleuchtung – keine aggressiven Stroboskopblitze. */
@@ -36,17 +40,17 @@
   <div class="jvg-grid">
     <div class="jvg-card" style="grid-column:1;grid-row:1"><div class="jvg-label">AUF</div>
       <button type="button" class="jvg-control" data-jvg-command="AUF" aria-label="Garagentor öffnen" disabled>
-        <span class="jvg-circle"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 88V12M14 48 50 12 86 48"/></svg></span>
+        <svg class="jvg-icon" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false"><circle class="jvg-icon-bg" cx="50" cy="50" r="50"/><g class="jvg-icon-mark" transform="translate(19 19) scale(0.62)"><path d="M50 88V12M14 48 50 12 86 48"/></g></svg>
       </button>
     </div>
     <div class="jvg-card jvg-stop" style="grid-column:1;grid-row:2"><div class="jvg-label">STOP</div>
       <button type="button" class="jvg-control" data-jvg-command="STOP" aria-label="Garagentor stoppen" disabled>
-        <span class="jvg-circle"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="38"/><rect x="35" y="35" width="30" height="30" rx="1"/></svg></span>
+        <svg class="jvg-icon" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false"><circle class="jvg-icon-bg" cx="50" cy="50" r="50"/><g class="jvg-icon-mark" transform="translate(18.5 18.5) scale(0.63)"><circle cx="50" cy="50" r="38"/><rect x="35" y="35" width="30" height="30" rx="1"/></g></svg>
       </button>
     </div>
     <div class="jvg-card" style="grid-column:1;grid-row:3"><div class="jvg-label">ZU</div>
       <button type="button" class="jvg-control" data-jvg-command="ZU" aria-label="Garagentor schließen" disabled>
-        <span class="jvg-circle"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12V88M14 52 50 88 86 52"/></svg></span>
+        <svg class="jvg-icon" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false"><circle class="jvg-icon-bg" cx="50" cy="50" r="50"/><g class="jvg-icon-mark" transform="translate(19 19) scale(0.62)"><path d="M50 12V88M14 52 50 88 86 52"/></g></svg>
       </button>
     </div>
     <div class="jvg-card jvg-position"><div class="jvg-label">Position</div>

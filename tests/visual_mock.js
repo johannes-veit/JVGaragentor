@@ -67,4 +67,11 @@ check(buttons.find(b=>b.dataset.jvgCommand==='STOP').disabled===false,'STOP blei
 check(buttons.find(b=>b.dataset.jvgCommand==='AUF').disabled===true,'Fahrbefehle bleiben gesperrt');
 check(html.includes('@media (prefers-reduced-motion: reduce)'),'Weniger Bewegung für sensible Nutzer');
 check(html.includes('jvg-yellow') && html.includes('jvg-red'),'Beide sanften CSS-Blinkanimationen vorhanden');
+// The native iOS button does not participate in icon sizing/centering.
+check((html.match(/class="jvg-icon" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"/g)||[]).length===3,'Alle drei Icons mit quadratischem, zentriertem SVG-ViewBox');
+check(html.includes('position:absolute;inset:0;width:100%;height:100%;border:0')&&html.includes('-webkit-appearance:none;appearance:none'),'WebKit: Button füllt Karte ohne natives Layout');
+check(html.includes('.jvg-control .jvg-icon {position:absolute;display:block;left:9%;top:12%;width:82%;height:82%'),'Icon unabhängig vom Button-Inhaltslayout');
+check(!html.includes('cqh')&&!html.includes('aspect-ratio:1')&&!html.includes('jvg-circle'),'Keine problematische intrinsische Iconhöhe / Container-Höheneinheit');
+check((html.match(/class="jvg-icon-bg" cx="50" cy="50" r="50"/g)||[]).length===3,'Kreise komplett innerhalb der SVG-ViewBox');
+check(html.includes('.jvg-stop .jvg-icon {left:30.65%;top:22%;width:38.7%;height:68%}'),'STOP behält kompakte Größe');
 console.log('PASS '+checks+' HTML/JS-Visualisierungstests');

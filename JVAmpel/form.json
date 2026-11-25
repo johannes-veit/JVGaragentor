@@ -2,12 +2,21 @@
   "elements": [
     {
       "type": "Label",
-      "caption": "JV Ampel v1.3 – getrennte WLED-Ansteuerung vorne/hinten; keine Torbefehle."
+      "caption": "JV Ampel v1.4 – direkte parallele WLED-Ansteuerung und Soll-Ist-Synchronprüfung."
     },
     {
       "type": "CheckBox",
       "name": "EnableAmpel",
       "caption": "Ampelautomatik aktivieren (nach Prüfung beider LED-Seiten)"
+    },
+    {
+      "type": "CheckBox",
+      "name": "UseLocalWatchdog",
+      "caption": "Lokalen Watchdog und direkte JSON-Synchronprüfung verwenden (Standard EIN, nur bestätigte Garage-Controller)"
+    },
+    {
+      "type": "Label",
+      "caption": "Automatisch: Frontpresets 1–4 als Vorlage für beide Seiten; zwei freie Watchdog-Presets je Controller, Boot-Preset AUS. Keine vorhandenen Farbpresets überschrieben. Keine manuelle Freigabe hinten nötig. Lokale Abschaltung bei ausbleibender Erneuerung (Soll 5 s). Hardwaretest erforderlich."
     },
     {
       "type": "SelectVariable",
@@ -43,7 +52,7 @@
     {
       "type": "CheckBox",
       "name": "RearPresetsVerified",
-      "caption": "Hintere Presets 1–4 mit richtigen Farben/Effekten geprüft; UDP-Synchronisierung zwischen beiden deaktiviert – direkte Ansteuerung freigeben"
+      "caption": "Nur Altmodus ohne lokalen Watchdog: hintere Presets manuell freigeben"
     },
     {
       "type": "SelectVariable",
@@ -55,7 +64,7 @@
     },
     {
       "type": "Label",
-      "caption": "Bei Verbindungsstörung bleibt der reale LED-Zustand unbekannt. Die Automatik versucht nach Wiederverbindung nur den aktuellen Sollzustand. Kein lokaler WLAN-Watchdog; keine Sicherheitsanzeige."
+      "caption": "Bei Verbindungsstörung bleibt der reale LED-Zustand unbekannt. Lokaler Watchdog ist zusätzlich vorgesehen; keine Sicherheitsanzeige."
     },
     {
       "type": "Label",
@@ -67,7 +76,7 @@
     },
     {
       "type": "Label",
-      "caption": "Kontrolle alle 2 s während aktiver Ampel oder Fehler, sonst alle 10 s. Kein wiederholtes Senden bei übereinstimmender Rückmeldung."
+      "caption": "Direkter Signalwechsel ohne Wartezeit, Kontrolle aktiv ca. 2 s, Ruhe 10 s; Synchronprüfung liest reale JSON-Zustände."
     }
   ],
   "actions": []

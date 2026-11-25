@@ -250,7 +250,7 @@ $gate->attrs['MovementStarted']=time()-9;
 $gate->Monitor();
 check($gate->values['Position']==='GESTOPPT' && $gate->values['Signal']===0, '8-s-Timeout wirkt vor der globalen 120-s-Grenze');
 
-$ampel=new JVAmpel();$ampel->Create();$ampel->ApplyChanges();
+$ampel=new JVAmpel();$ampel->Create();$ampel->props['UseLocalWatchdog']=false;$ampel->ApplyChanges();
 check($ampel->values['AmpelStatus']==='Automatik AUS','Ampel standardmäßig gesperrt');
 // Alle Gerätewerte sind der Simulation zufolge im WLED Master nur ein Preset-Signal.
 mkVar(80004,1,0,false);
@@ -322,6 +322,7 @@ $GLOBALS['simGateSignals'] = [21001 => 80004];
 $ampelAuto = new JVAmpel();
 $ampelAuto->InstanceID = 21003;
 $ampelAuto->Create();
+$ampelAuto->props['UseLocalWatchdog']=false;
 $ampelAuto->ApplyChanges();
 check($ampelAuto->attrs['SubscribedVariable'] === 80004,
     'Einzige Torinstanz wird ohne manuelle Variable erkannt');
@@ -564,4 +565,56 @@ $GLOBALS['simLCNParents'][13220] = 22849;
 $realGate->Monitor();
 check($realGate->values['Position'] === 'ZU' && $realGate->values['Signal'] === 0,
     'Wiederhergestellte Zuordnung zeigt bestätigte Endlage ohne Schein-Nachleuchten');
+// JSON-Watchdog: emulate WLED API (not actual firmware or LED timing).
+class WdTestAmpel extends JVAmpel {
+    public array $docs=[], $presets=[], $requests=[];
+    public function initWd(): void {
+        foreach (['front'=>'8c8c290df2ec','rear'=>'007007c90d6c'] as $side=>$mac) {
+            $this->docs[$side]=['info'=>['ver'=>'0.15.0-b7','mac'=>$mac,'leds'=>['count'=>1,'bootps'=>0],'fs'=>['pmt'=>1]],'state'=>['on'=>false,'bri'=>255,'pl'=>-1,'nl'=>['on'=>false],'udpn'=>['send'=>false,'sgrp'=>0,'rgrp'=>0],'seg'=>[]]];
+            $this->presets[$side]=[];
+        }
+        foreach ([1=>[255,160,0,0],2=>[0,255,0,0],3=>[255,0,0,0],4=>[255,0,0,0]] as $i=>$col)
+            $this->presets['front'][$i]=['on'=>true,'bri'=>255,'seg'=>[['id'=>0,'col'=>[$col,[0,0,0,0],[0,0,0,0]],'fx'=>in_array($i,[1,3])?2:0,'sx'=>128,'ix'=>128,'pal'=>0]]];
+        $this->presets['rear'][250]=['n'=>'Existing user preset','on'=>true];
+    }
+    protected function WledHttp(array $requests): array {
+        $this->requests[]=$requests; $r=[];
+        foreach ($requests as $side=>$req) {
+            if (!isset($this->docs[$side])) { $r[$side]=null; continue; }
+            if ($req['path']==='/json/si') { $r[$side]=$this->docs[$side]; continue; }
+            if ($req['path']==='/presets.json') { $r[$side]=$this->presets[$side]; continue; }
+            $b=$req['body']; $s=&$this->docs[$side]['state'];
+            if (isset($b['psave'])) {
+                $id=$b['psave']; $save=$b; unset($save['psave'],$save['o'],$save['bootps']);
+                $this->presets[$side][$id]=$save; $this->docs[$side]['info']['fs']['pmt']++;
+                if (isset($b['bootps'])) $this->docs[$side]['info']['leds']['bootps']=$b['bootps'];
+            }
+            foreach (['on','bri','seg','nl','udpn'] as $k) if (isset($b[$k])) $s[$k]=$b[$k];
+            if (isset($b['playlist'])) $s['pl']=$b['playlist']['ps']===[]?-1:0;
+            $r[$side]=['success'=>true]; unset($s);
+        }
+        return $r;
+    }
+}
+resetHardware(); mkVar(80004,VARIABLETYPE_INTEGER,0,false);
+$wd=new WdTestAmpel();$wd->Create();$wd->initWd();
+$wd->props['SignalVariable']=80004;$wd->props['EnableAmpel']=true;$wd->ApplyChanges();
+check($wd->attrs['WatchdogSetup']!=='','Automatische Watchdog-Einrichtung ohne Freigabe hinten');
+check($wd->presets['rear'][250]['n']==='Existing user preset','Keine vorhandenen Presets überschrieben');
+check($wd->docs['rear']['info']['leds']['bootps']!==0,'Boot-AUS eingerichtet');
+$wd->Sync();
+$GLOBALS['simVars'][80004]['value']=3;
+$wd->requests=[];$wd->MessageSink(time(),80004,VM_UPDATE,[]);
+check(count($wd->requests)===1&&isset($wd->requests[0]['front'],$wd->requests[0]['rear']),'Signalwechsel ohne vorherigen Poll parallel gesendet');
+check($wd->requests[0]['rear']['body']['playlist']['dur']===[50]&&$wd->requests[0]['rear']['body']['tt']===0,'Lokales Ablaufdatum und sofortiger Start');
+$wd->Sync();
+check(str_contains($wd->values['AmpelStatus'],'synchron'),'Beide echten Szenenparameter abgeglichen');
+$wd->docs['rear']['state']['seg'][0]['fx']=0;
+$wd->Sync();
+check(!$wd->docs['front']['state']['on']&&!$wd->docs['rear']['state']['on'],'Abweichender Effekt führt zu AUS auf beiden Seiten');
+$wd->Sync();
+check($wd->docs['rear']['state']['seg'][0]['fx']===2,'Aktuelle Szene nach Abweichung korrigiert');
+$GLOBALS['simVars'][80004]['value']=0;
+$wd->Sync();
+check(!$wd->docs['front']['state']['on']&&!$wd->docs['rear']['state']['on'],'Signal 0 schaltet beide ab');
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

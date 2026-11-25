@@ -1,15 +1,23 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/WledWatchdog.php';
+
 /** JV Ampel: zwei getrennte WLED-Master (Tor und CS320 unberührt). */
 class JVAmpel extends IPSModuleStrict
 {
+    use JVWledWatchdogTrait;
+
     private const GATE_MODULE_ID = '{8193BC5B-9A6A-48A3-A70C-B69A73472328}';
 
     public function Create(): void
     {
         parent::Create();
         $this->RegisterPropertyBoolean('EnableAmpel', false);
+        $this->RegisterPropertyBoolean('UseLocalWatchdog', true);
+        $this->RegisterAttributeString('WatchdogSetup', '');
+        $this->RegisterAttributeInteger('WatchdogLastSignal', -1);
+        $this->RegisterAttributeInteger('WatchdogLastSent', 0);
         $this->RegisterPropertyInteger('SignalVariable', 0);
         $this->RegisterPropertyInteger('PresetVariable', 46199);
         $this->RegisterPropertyInteger('PowerVariable', 29605);
@@ -107,6 +115,7 @@ class JVAmpel extends IPSModuleStrict
         $this->UpdateSignalSubscription();
         $this->WriteAttributeInteger('LastFrontSignal', -1);
         $this->WriteAttributeInteger('LastRearSignal', -1);
+        $this->WriteAttributeInteger('WatchdogLastSignal', -1);
         $this->SetTimerInterval('Synchronize', 10000);
         $this->Sync();
     }
@@ -148,6 +157,10 @@ class JVAmpel extends IPSModuleStrict
             } else {
                 $this->WriteAttributeInteger('BlockedGateSignal', -1);
             }
+        }
+        if ($this->ReadPropertyBoolean('UseLocalWatchdog')) {
+            $this->SyncWatchdog($source, $raw, $signal, $note);
+            return;
         }
         $fp = $this->ReadPropertyInteger('PresetVariable');
         $fw = $this->ReadPropertyInteger('PowerVariable');

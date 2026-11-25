@@ -2,7 +2,7 @@
   "elements": [
     {
       "type": "Label",
-      "caption": "JV Ampel v1.1 – unabhängig von der Toransteuerung. Schaltet nur WLED vorne; hinten übernimmt WLED-Synchronisierung."
+      "caption": "JV Ampel v1.3 – getrennte WLED-Ansteuerung vorne/hinten; keine Torbefehle."
     },
     {
       "type": "CheckBox",
@@ -25,6 +25,39 @@
       "caption": "WLED Garage vorne: Ein – ID 29605"
     },
     {
+      "type": "SelectVariable",
+      "name": "RearPresetVariable",
+      "caption": "WLED hinten: Voreinstellungen – ID 17676",
+      "validVariableTypes": [
+        1
+      ]
+    },
+    {
+      "type": "SelectVariable",
+      "name": "RearPowerVariable",
+      "caption": "WLED hinten: Ein – ID 16055",
+      "validVariableTypes": [
+        0
+      ]
+    },
+    {
+      "type": "CheckBox",
+      "name": "RearPresetsVerified",
+      "caption": "Hintere Presets 1–4 mit richtigen Farben/Effekten geprüft; UDP-Synchronisierung zwischen beiden deaktiviert – direkte Ansteuerung freigeben"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "GateOnlineVariable",
+      "caption": "Tor-Shelly Erreichbar – ID 17585",
+      "validVariableTypes": [
+        0
+      ]
+    },
+    {
+      "type": "Label",
+      "caption": "Bei Verbindungsstörung bleibt der reale LED-Zustand unbekannt. Die Automatik versucht nach Wiederverbindung nur den aktuellen Sollzustand. Kein lokaler WLAN-Watchdog; keine Sicherheitsanzeige."
+    },
+    {
       "type": "Label",
       "caption": "Ampel-Signal 1 -> WLED Preset 1 Gelb pulsierend; 2 -> Preset 2 Grün; 3 -> Preset 3 Rot pulsierend; 4 -> Preset 4 Rot statisch. Signal 0 -> WLED AUS."
     },
@@ -34,7 +67,7 @@
     },
     {
       "type": "Label",
-      "caption": "Automatische Verknüpfung wird beim Start und alle 10 Sekunden geprüft. Bei genau einer Torinstanz musst du das Ampel-Signal nicht auswählen."
+      "caption": "Kontrolle alle 2 s während aktiver Ampel oder Fehler, sonst alle 10 s. Kein wiederholtes Senden bei übereinstimmender Rückmeldung."
     }
   ],
   "actions": []

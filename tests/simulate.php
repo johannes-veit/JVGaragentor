@@ -8,6 +8,7 @@ const VM_UPDATE = 10603;
 $GLOBALS['simVars'] = [];
 $GLOBALS['simActions'] = [];
 $GLOBALS['simNoAction'] = [];
+$GLOBALS['simWledInstances'] = [];
 $GLOBALS['simGateInstances'] = [];
 $GLOBALS['simGateSignals'] = [];
 $GLOBALS['simLCNModules'] = [];
@@ -23,8 +24,9 @@ function IPS_GetInstanceListByModuleID(string $guid): array {
 }
 function IPS_InstanceExists(int $id): bool {
     return in_array($id, $GLOBALS['simGateInstances'], true) ||
-        in_array($id, $GLOBALS['simLCNModules'], true);
+        in_array($id, $GLOBALS['simLCNModules'], true) || isset($GLOBALS['simWledInstances'][$id]);
 }
+function IPS_GetInstance(int $id): array { return $GLOBALS['simWledInstances'][$id]; }
 function IPS_ObjectExists(int $id): bool {
     return IPS_VariableExists($id) ||
         in_array($id, $GLOBALS['simLCNModules'], true) ||
@@ -55,10 +57,11 @@ function GetValueBoolean(int $id): bool { return (bool)$GLOBALS['simVars'][$id][
 function GetValueInteger(int $id): int { return (int)$GLOBALS['simVars'][$id]['value']; }
 function GetValueString(int $id): string { return (string)$GLOBALS['simVars'][$id]['value']; }
 function RequestAction(int $id, mixed $value): bool {
-    if (!IPS_VariableExists($id) || !($GLOBALS['simVars'][$id]['action'] ?? false)) return false;
+    if (!IPS_VariableExists($id) || !($GLOBALS['simVars'][$id]['action'] ?? false) || in_array($id,$GLOBALS['simNoAction'],true)) return false;
     $GLOBALS['simActions'][]=[$id,$value];
     $GLOBALS['simVars'][$id]['value']=$value;
-    if ($id===46199 && in_array($value,[1,2,3,4],true)) $GLOBALS['simVars'][29605]['value']=true; // WLED-Presets enthalten on:true.
+    if ($id===46199 && in_array($value,[1,2,3,4],true)) $GLOBALS['simVars'][29605]['value']=true;
+    if ($id===17676 && in_array($value,[1,2,3,4],true)) $GLOBALS['simVars'][16055]['value']=true;
     return true;
 }
 class IPSModuleStrict {
@@ -117,6 +120,10 @@ function resetHardware(): void {
     mkVar(44228,0,false);mkVar(56652,0,false);mkVar(55944,0,true);mkVar(17585,0,true);
     mkVar(80001,0,false,false);mkVar(80002,0,true,false); // Start in Endlage ZU
     mkVar(46199,1,4);mkVar(29605,0,true);
+    mkVar(17676,1,3);mkVar(16055,0,true);
+    $GLOBALS['simLCNParents'] += [46199=>17732,29605=>17732,17676=>31076,16055=>31076];
+    $GLOBALS['simWledInstances'] = [17732=>['InstanceStatus'=>102,'ConnectionID'=>90001],31076=>['InstanceStatus'=>102,'ConnectionID'=>90002],90001=>['InstanceStatus'=>102,'ConnectionID'=>0],90002=>['InstanceStatus'=>102,'ConnectionID'=>0]];
+    $GLOBALS['simNoAction'] = [];
 }
 resetHardware();
 $gate=new JVGaragentor();$gate->Create();$gate->props['EndOpenVariable']=80001;$gate->props['EndCloseVariable']=80002;$gate->ApplyChanges();
@@ -249,14 +256,17 @@ check($ampel->values['AmpelStatus']==='Automatik AUS','Ampel standardmäßig ges
 mkVar(80004,1,0,false);
 $ampel->props['SignalVariable']=80004;
 $ampel->props['EnableAmpel']=true;
+$ampel->props['RearPresetsVerified']=true;
 $ampel->ApplyChanges();
 check(end($GLOBALS['simActions'])===[29605,false],'Signal 0 stellt WLED AUS');
 check($GLOBALS['simVars'][29605]['value']===false,'WLED aus bei Signal 0');
+check($GLOBALS['simVars'][16055]['value']===false,'Auch WLED hinten bei Signal 0 aus');
 foreach([1,2,3,4] as $preset){
     $GLOBALS['simVars'][80004]['value']=$preset;
     $ampel->MessageSink(time(),80004,VM_UPDATE,[]);
     check($GLOBALS['simVars'][46199]['value']===$preset,"Presetwert für Signal $preset");
     check($GLOBALS['simVars'][29605]['value']===true,'Preset schaltet WLED an');
+    check($GLOBALS['simVars'][17676]['value']===$preset && $GLOBALS['simVars'][16055]['value']===true,'Hinten erhält denselben aktuellen Presetwert');
 }
 $old=count($GLOBALS['simActions']);
 $ampel->Sync();
@@ -270,6 +280,38 @@ check($GLOBALS['simVars'][29605]['value']===true,'WLED startet erneut bei neuer 
 $GLOBALS['simVars'][80004]['value']=9;
 $ampel->Sync();
 check($GLOBALS['simVars'][29605]['value']===false,'Ungültiges Signal schaltet vorsorglich aus');
+// Fehler hinten während Rot: vorne reagiert weiter, nach Reconnect nur neuer Sollzustand.
+$GLOBALS['simVars'][80004]['value']=3;
+$ampel->Sync();
+$GLOBALS['simWledInstances'][90002]['InstanceStatus']=200;
+$GLOBALS['simVars'][80004]['value']=0;
+$ampel->Sync();
+check(!$GLOBALS['simVars'][29605]['value'] && $GLOBALS['simVars'][16055]['value'],'Offline hinten: vorne aus, hinten tatsächlich unbekannt');
+check(str_contains($ampel->values['AmpelStatus'],'Verbindung gestört'),'Fehler hinten sichtbar');
+$GLOBALS['simWledInstances'][90002]['InstanceStatus']=102;
+$ampel->Sync();
+check(!$GLOBALS['simVars'][16055]['value'],'Reconnect schaltet veraltetes Rot hinten aus');
+$GLOBALS['simVars'][80004]['value']=1;
+$ampel->Sync();
+$GLOBALS['simNoAction']=[17676];
+$GLOBALS['simVars'][80004]['value']=4;
+$ampel->Sync();
+check(!$GLOBALS['simVars'][16055]['value'] && $GLOBALS['simVars'][46199]['value']===4,'Fehler beim Preset hinten: AUS statt altes Signal, vorne unabhängig');
+$GLOBALS['simNoAction']=[];
+$ampel->Sync();
+check($GLOBALS['simVars'][17676]['value']===4 && $GLOBALS['simVars'][16055]['value'],'Fehler behoben: nur aktuelles Preset hinten');
+$GLOBALS['simVars'][17585]['value']=false;
+$ampel->Sync();
+check(!$GLOBALS['simVars'][29605]['value'] && !$GLOBALS['simVars'][16055]['value'],'Tor-Shelly offline: beide AUS');
+$GLOBALS['simVars'][17585]['value']=true;
+$ampel->Sync();
+check(!$GLOBALS['simVars'][29605]['value'],'Keine Reaktivierung des alten Torsignals nach Reconnect');
+$GLOBALS['simVars'][80004]['value']=2;
+$ampel->Sync();
+check($GLOBALS['simVars'][46199]['value']===2 && $GLOBALS['simVars'][17676]['value']===2,'Neues Signal nach Reconnect wird übernommen');
+$ampel->props['RearPresetsVerified']=false;
+$ampel->Sync();
+check(!$GLOBALS['simVars'][16055]['value'],'Ungeprüfte hintere Presets bleiben AUS');
 $ampel->props['EnableAmpel']=false;
 $old=count($GLOBALS['simActions']);$ampel->Sync();
 check(count($GLOBALS['simActions'])===$old,'Ampel AUS sperrt Schalten');

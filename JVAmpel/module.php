@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-/** JV Ampel: ausschließlich WLED-Master-Presetansteuerung (Tor und CS320 unberührt). */
+/** JV Ampel: zwei getrennte WLED-Master (Tor und CS320 unberührt). */
 class JVAmpel extends IPSModuleStrict
 {
     private const GATE_MODULE_ID = '{8193BC5B-9A6A-48A3-A70C-B69A73472328}';
@@ -13,6 +13,13 @@ class JVAmpel extends IPSModuleStrict
         $this->RegisterPropertyInteger('SignalVariable', 0);
         $this->RegisterPropertyInteger('PresetVariable', 46199);
         $this->RegisterPropertyInteger('PowerVariable', 29605);
+        $this->RegisterPropertyInteger('RearPresetVariable', 17676);
+        $this->RegisterPropertyInteger('RearPowerVariable', 16055);
+        $this->RegisterPropertyBoolean('RearPresetsVerified', false);
+        $this->RegisterPropertyInteger('GateOnlineVariable', 17585);
+        $this->RegisterAttributeInteger('LastFrontSignal', -1);
+        $this->RegisterAttributeInteger('LastRearSignal', -1);
+        $this->RegisterAttributeInteger('BlockedGateSignal', -1);
         $this->RegisterAttributeInteger('SubscribedVariable', 0);
         $this->RegisterVariableString('AmpelStatus', 'Ampel-Status', [], 0);
         $this->RegisterTimer('Synchronize', 10000, 'JVGA_Sync($_IPS["TARGET"]);');
@@ -98,6 +105,8 @@ class JVAmpel extends IPSModuleStrict
         parent::ApplyChanges();
         $this->RegisterVariableString('AmpelStatus', 'Ampel-Status', [], 0);
         $this->UpdateSignalSubscription();
+        $this->WriteAttributeInteger('LastFrontSignal', -1);
+        $this->WriteAttributeInteger('LastRearSignal', -1);
         $this->SetTimerInterval('Synchronize', 10000);
         $this->Sync();
     }
@@ -114,70 +123,112 @@ class JVAmpel extends IPSModuleStrict
     {
         $source = $this->UpdateSignalSubscription();
         if (!$this->ReadPropertyBoolean('EnableAmpel')) {
+            $this->WriteAttributeInteger('LastFrontSignal', -1);
+            $this->WriteAttributeInteger('LastRearSignal', -1);
+            $this->SetTimerInterval('Synchronize', 10000);
             $this->SetStatusText('Automatik AUS');
             return;
         }
-        $presetVar = $this->ReadPropertyInteger('PresetVariable');
-        if (!$this->IsVariable($source, VARIABLETYPE_INTEGER) ||
-            !$this->IsVariable($presetVar, VARIABLETYPE_INTEGER)) {
-            // Keine Tor-Statusquelle: keine zuvor signalisierte Fahrt weiter anzeigen.
-            // Nur aktiv, wenn die Ampelautomatik ausdrücklich eingeschaltet ist.
-            $powerID = $this->ReadPropertyInteger('PowerVariable');
-            if ($this->IsVariable($powerID, VARIABLETYPE_BOOLEAN) && GetValueBoolean($powerID)) {
-                try {
-                    RequestAction($powerID, false);
-                } catch (Throwable $e) {
-                    $this->SetStatusText('Fehler beim Ausschalten nach Signalverlust: ' . $e->getMessage());
-                    return;
-                }
-            }
-            $this->SetStatusText('Ampel AUS: Signalquelle oder WLED-Voreinstellungen fehlen. Torinstanz und Verknüpfung prüfen.');
-            return;
-        }
-        $signal = GetValueInteger($source);
-        if (!in_array($signal, [0, 1, 2, 3, 4], true)) {
-            $this->SetStatusText('Ungültiges Ampel-Signal – WLED vorsorglich AUS.');
+        $validSource = $this->IsVariable($source, VARIABLETYPE_INTEGER);
+        $raw = $validSource ? GetValueInteger($source) : -1;
+        $signal = in_array($raw, [0, 1, 2, 3, 4], true) ? $raw : 0;
+        $note = $validSource && $raw === $signal ? '' : 'Signalquelle ungültig; ';
+        $online = $this->ReadPropertyInteger('GateOnlineVariable');
+        $gateOnline = $this->IsVariable($online, VARIABLETYPE_BOOLEAN) && GetValueBoolean($online);
+        if (!$gateOnline || !$validSource || $raw !== $signal) {
+            // Nach Verlust der Torquelle nicht denselben möglicherweise alten Zustand neu aktivieren.
+            $this->WriteAttributeInteger('BlockedGateSignal', $signal > 0 ? $signal : -1);
             $signal = 0;
-        }
-        // Signal 0 enthält STOPP, Timeout und abgelaufene Nachleuchtzeit.
-        if ($signal === 0) {
-            $power = $this->ReadPropertyInteger('PowerVariable');
-            if (!$this->IsVariable($power, VARIABLETYPE_BOOLEAN)) {
-                $this->SetStatusText('Ampel AUS – WLED-Ein/Aus-Variable fehlt.');
-                return;
+            if (!$gateOnline) $note .= 'Tor-Shelly nicht erreichbar; ';
+        } else {
+            $blocked = $this->ReadAttributeInteger('BlockedGateSignal');
+            if ($blocked > 0 && $signal === $blocked) {
+                $signal = 0;
+                $note .= 'Warte auf neues Torsignal nach Ausfall; ';
+            } else {
+                $this->WriteAttributeInteger('BlockedGateSignal', -1);
             }
-            if (GetValueBoolean($power)) {
-                try {
-                    if (!RequestAction($power, false)) {
-                        $this->SetStatusText('Ampel AUS – Ausschalten fehlgeschlagen.');
-                        return;
-                    }
-                } catch (Throwable $e) {
-                    $this->SetStatusText('WLED Fehler: ' . $e->getMessage());
-                    return;
-                }
-            }
-            $this->SetStatusText('Ampel AUS (Signal 0).');
+        }
+        $fp = $this->ReadPropertyInteger('PresetVariable');
+        $fw = $this->ReadPropertyInteger('PowerVariable');
+        $rp = $this->ReadPropertyInteger('RearPresetVariable');
+        $rw = $this->ReadPropertyInteger('RearPowerVariable');
+        // Nie zwei Seiten auf dieselben Variablen oder dasselbe Gerät schalten.
+        if (count(array_unique([$fp,$fw,$rp,$rw])) !== 4 ||
+            ($this->IsVariable($fw, VARIABLETYPE_BOOLEAN) && $this->IsVariable($rw, VARIABLETYPE_BOOLEAN) &&
+             IPS_GetParent($fw) === IPS_GetParent($rw))) {
+            $this->SetTimerInterval('Synchronize', 2000);
+            $this->SetStatusText('Konfigurationsfehler: WLED vorne/hinten nicht eindeutig getrennt.');
             return;
         }
-        if ($signal < 1 || $signal > 4) {
-            $this->SetStatusText('Nicht unterstützter Torstatus – keine WLED-Änderung.');
-            return;
+        $rearReady = $this->ReadPropertyBoolean('RearPresetsVerified');
+        // Ungeprüfte hintere Presets nie aufrufen. AUS bleibt auch ohne Preset möglich.
+        [$rearOK, $rear] = $this->SyncSide($rp, $rw, $rearReady ? $signal : 0, 'LastRearSignal');
+        [$frontOK, $front] = $this->SyncSide($fp, $fw, $signal, 'LastFrontSignal');
+        $this->SetTimerInterval('Synchronize', ($signal !== 0 || !$frontOK || !$rearOK) ? 2000 : 10000);
+        $this->SetStatusText($note . 'Signal ' . $signal . ' | vorne: ' . $front .
+            ' | hinten: ' . $rear . ($rearReady ? '' : ' (Presets noch nicht freigegeben)'));
+    }
+
+    /** Verbindungsstatus einschließlich Gateway und WebSocket, nicht nur gespeicherte Variablen. */
+    private function ConnectionActive(int $instance): bool
+    {
+        if ($instance <= 0) return false;
+        $visited = [];
+        while ($instance > 0) {
+            if (isset($visited[$instance]) || !IPS_InstanceExists($instance)) return false;
+            $visited[$instance] = true;
+            $info = IPS_GetInstance($instance);
+            if ((int)$info['InstanceStatus'] !== 102) return false;
+            $instance = (int)$info['ConnectionID'];
         }
-        $power = $this->ReadPropertyInteger('PowerVariable');
-        $isPowerOff = $this->IsVariable($power, VARIABLETYPE_BOOLEAN) && !GetValueBoolean($power);
-        if (GetValueInteger($presetVar) === $signal && !$isPowerOff) {
-            $this->SetStatusText('Signal ' . $signal . ' – Preset ' . $signal . ' aktiv.');
-            return;
+        return true;
+    }
+
+    /** @return array{0: bool, 1: string} */
+    private function SyncSide(int $preset, int $power, int $signal, string $lastKey): array
+    {
+        if (!$this->IsVariable($power, VARIABLETYPE_BOOLEAN)) {
+            $this->WriteAttributeInteger($lastKey, -1);
+            return [false, 'Ein/Aus fehlt'];
         }
         try {
-            if (!RequestAction($presetVar, $signal)) {
-                $this->SetStatusText('Signal ' . $signal . ' – Preset ' . $signal . ' nicht angenommen.');
-                return;
+            $parent = IPS_GetParent($power);
+            if (!$this->ConnectionActive($parent)) {
+                $this->WriteAttributeInteger($lastKey, -1);
+                return [false, 'Verbindung gestört – tatsächlicher LED-Zustand unbekannt'];
             }
-            $this->SetStatusText('Signal ' . $signal . ' – Preset ' . $signal . ' an WLED vorne gesendet.');
+            $presetValid = $this->IsVariable($preset, VARIABLETYPE_INTEGER) && IPS_GetParent($preset) === $parent;
+            if ($signal !== 0 && !$presetValid) {
+                // Bei fehlender Preset-Zuordnung bestmöglich ausschalten, nicht blind einschalten.
+                RequestAction($power, false);
+                $this->WriteAttributeInteger($lastKey, -1);
+                return [false, 'Preset fehlt – AUS angefordert'];
+            }
+            $last = $this->ReadAttributeInteger($lastKey);
+            $on = GetValueBoolean($power);
+            $matches = $signal === 0 ? !$on : $on && GetValueInteger($preset) === $signal;
+            if ($matches && $last === $signal) {
+                return [true, $signal === 0 ? 'AUS (Rückmeldung)' : 'Preset ' . $signal . ' (Rückmeldung)'];
+            }
+            // Bei neuem Sollsignal oder Wiederverbindung auch dann senden, wenn Variablen
+            // noch den alten gecachten Sollwert zeigen. Niemals alte Befehle puffern.
+            $ok = $signal === 0 ? RequestAction($power, false) : RequestAction($preset, $signal);
+            if (!$ok) {
+                $this->WriteAttributeInteger($lastKey, -1);
+                if ($signal !== 0) {
+                    try { RequestAction($power, false); } catch (Throwable $ignored) {}
+                }
+                return [false, 'Befehl fehlgeschlagen – Zustand nicht bestätigt'];
+            }
+            $this->WriteAttributeInteger($lastKey, $signal);
+            return [true, $signal === 0 ? 'AUS angefordert' : 'Preset ' . $signal . ' angefordert'];
         } catch (Throwable $e) {
-            $this->SetStatusText('WLED Fehler: ' . $e->getMessage());
+            $this->WriteAttributeInteger($lastKey, -1);
+            if ($signal !== 0) {
+                try { RequestAction($power, false); } catch (Throwable $ignored) {}
+            }
+            return [false, 'Fehler: ' . $e->getMessage()];
         }
     }
 

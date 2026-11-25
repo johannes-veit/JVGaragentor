@@ -3,7 +3,7 @@
 Eigenständige IP-Symcon-Bibliothek mit **zwei getrennten Gerätemodulen**:
 
 - **JVGaragentor**: AUF / STOP / ZU über Shelly Pro 3, Endlagen- und Timeoutüberwachung, mobile Kachel mit großen Bedientasten und eigener farbiger Positionsanzeige.
-- **JVAmpel**: übernimmt **ausschließlich** das vom Tormodul berechnete Ampel-Signal (0–4) und schaltet darüber WLED vorne. Kein Torbefehl möglich.
+- **JVAmpel**: übernimmt **ausschließlich** das vom Tormodul berechnete Ampel-Signal (0–4) und schaltet darüber beide WLED-Controller getrennt. Kein Torbefehl möglich.
 
 Die Architektur wurde anhand der Schiebetor-Skripte und der Visualisierungsverknüpfungen aus dem SymBox-Backup vom 07.11.2026 vereinfacht. Das bestehende Schiebetor wird nicht verändert.
 
@@ -37,7 +37,7 @@ Die Tor-Instanz besitzt dazu eine zusätzliche Integer-Variable **„Ampel-Signa
 3. **JVGaragentor:** Shelly-Variablen kontrollieren, **beide tatsächlichen Endlagenrückmeldungen** zuweisen und die Laufzeit-/Nachleuchtzeiten einstellen. Die Toransteuerung ist standardmäßig gesperrt.
 4. **JVGaragentor-Kachel:** In die Symcon-Kachelvisualisierung einbinden. Linke Spalte: große AUF-/STOP-/ZU-Tasten; rechte Spalte: Status und synchron zur Ampel animierter Farbhintergrund.
 5. **JVAmpel:** Das Modul verbindet sich **automatisch** mit der Integer-Variable „Ampel-Signal“ der Torsteuerung, wenn genau **eine** JVGaragentor-Torinstanz vorhanden ist. Ein leerer manueller Eingang bedeutet **automatische Erkennung**, kein Fehler. Bei mehreren Torinstanzen muss die gewünschte Integer-Variable ausdrücklich ausgewählt werden. Die String-Variable „Position“ ist nicht geeignet.
-6. WLED-Ausgänge prüfen: vorne Presets **#46199**, Ein/Aus **#29605**. Den hinteren Controller nicht doppelt ansteuern, da er über WLED-Synchronisierung folgt. **Vor Freigabe prüfen, ob alle vier Preset-/Effektwechsel auch hinten ankommen.**
+6. WLED-Ausgänge prüfen: vorne Presets **#46199**, Ein/Aus **#29605**, hinten Presets **#17676**, Ein/Aus **#16055**. Vor direkter Ansteuerung UDP-Synchronisierung zwischen beiden ausschalten und an beiden Controllern identische Preset-Bedeutungen prüfen (1–4, inklusive Einschalten). Danach hintere Presets in der Ampelinstanz freigeben. Ungeprüfte hintere Presets werden nicht aufgerufen.
 7. Nach realem Prüfablauf für Ampel und Tor **getrennt** die Automatikfreigaben setzen. Bis dahin beide deaktiviert lassen.
 
 **Kein Hardwaretest möglich:** Das Modul ist mit PHP-Mocks und JavaScript-Tests geprüft, aber nicht auf der echten SymBox und nicht mit der realen CS320-FU gefahren. Der Shelly Pro 3 wurde zuletzt als elektrisch noch nicht an die CS320 angeschlossen gemeldet. Daher keine Freigabe zum automatischen Torbetrieb ohne reale Abnahme.
@@ -58,7 +58,7 @@ Shelly Pro 3 Garagentor: Instanz **22849**, IP `192.168.103.73`.
 ## WLED-Ampel
 
 - WLED Garage vorne: **192.168.103.91**, Instanz **17732**, Preset **46199**, Power **29605**.
-- WLED Garage hinten: **192.168.103.92**, Instanz **31076**, folgt geräteseitig via WLED-Synchronisierung.
+- WLED Garage hinten: **192.168.103.92**, Instanz **31076**, Preset **17676**, Power **16055**; ab v1.2.3 getrennte Ansteuerung. 2-s-Prüfung bei aktivem Signal oder Fehler, sonst 10 s. Symcon-Gateway/Verbindungsstatus wird getrennt geprüft. Bei Wiederverbindung wird nur der aktuelle Sollzustand gesendet; ein vollständig offline befindlicher Controller kann dennoch sein letztes Lichtsignal halten. Kein lokaler Watchdog enthalten; die Anzeige ist keine Sicherheitseinrichtung.
 - Presets in WLED-Master über **„Voreinstellungen“** einblenden. Diese Integer-Variable verarbeitet die Werte 1, 2, 3 und 4. Die Werte 0 und 5 werden für das Tor nicht verwendet.
 
 Die Blinkfrequenz der realen WLED-Ampel wird innerhalb der Presets festgelegt. Die Handy-Kachel verwendet dieselben **Farben und Zustandsdauern**, nicht zwangsläufig exakt dieselbe Blinkphase.
@@ -95,7 +95,7 @@ GitHub Actions prüft zusätzlich JSON und die JavaScript-Syntax. Reale Endlagen
 ## Automatische Konfiguration (v1.1.1)
 
 - Vorbelegt: Shelly O1 AUF **44228**, O2 ZU **56652**, O3 STOP **55944**, Online **17585**.
-- Vorbelegt: WLED Garage vorne Presets **46199**, Ein/Aus **29605**; hinten synchronisiert geräteseitig.
+- Vorbelegt: WLED Garage vorne Presets **46199**, Ein/Aus **29605**, hinten Presets **17676**, Ein/Aus **16055** (ab v1.2.3, Freigabe nach Preset-Prüfung).
 - Die **Ampel-Signal-Variable** wird automatisch aus der **einzigen** JVGaragentor-Instanz ermittelt. Ihre Objekt-ID ist erst nach Erstellung dieser Instanz bekannt. Die Verbindung wird auch dann gefunden, wenn die Torinstanz später angelegt wird (10-Sekunden-Timer).
 - Bei mehreren Torinstanzen oder einer bewusst gesetzten, aber ungültigen manuellen Variable erfolgt **keine** automatische Wahl irgendeiner Quelle.
 - Vorbelegt und anhand realer Endlagen bestätigt: AUF **13220**, ZU **21923**. Fahrbefehle erst nach realer Prüfung freigeben; die Standard-Sicherheitssperre bleibt aktiv.

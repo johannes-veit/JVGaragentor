@@ -6,7 +6,7 @@
     },
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.2.2 – LCN-M51 Host-Kommando bereits vorbelegt (Instanz 30888, Befehl 35739). Beide LCN-Tastenkanäle bleiben bis zum Empfangstest ausgeschaltet."
+      "caption": "JV Garagentor v1.2.5 – einmalige C2-Freigabe nur für bestätigte Instanz #15957, bei korrekter Zuordnung und ruhendem, bereits freigegebenem Tor."
     },
     {
       "type": "CheckBox",
@@ -103,11 +103,11 @@
     },
     {
       "type": "Label",
-      "caption": "LCN-GT2 vorbereitet: JVG_Command(GARAGENTOR_INSTANZ_ID, 'ZU') bei kurz, JVG_Command(..., 'AUF') bei lang. Ereignisse erst nach Test zuordnen."
+      "caption": "LCN-GT2 vorbereitet: JVG_Command(GARAGENTOR_INSTANZ_ID, 'ZU') bei kurz, JVG_Command(..., 'AUF') bei lang. Für die bestätigte Instanz #15957 automatisch freigeben, keine gespeicherten Telegramme ausführen."
     },
     {
       "type": "Label",
-      "caption": "LCN M51 ist die Kategorie #37682, keine auswählbare Instanz! Die tatsächlich auswählbare Dateninstanz heißt Host-Kommando #30888 und enthält Befehl #35739. Der PCHK-Host hat bestätigt ID4: LCN-PRO-Ziel M4. Beide LCN-Kanäle bleiben bis zum Test AUS."
+      "caption": "LCN M51 ist die Kategorie #37682, keine auswählbare Instanz! Die tatsächlich auswählbare Dateninstanz heißt Host-Kommando #30888 und enthält Befehl #35739. Der PCHK-Host hat bestätigt ID4: LCN-PRO-Ziel M4. C1 bleibt unverändert; C2 kann einmalig automatisch freigegeben werden."
     },
     {
       "type": "Label",
@@ -116,7 +116,7 @@
     {
       "type": "CheckBox",
       "name": "LCNGarageEnabled",
-      "caption": "LCN-Taste Garagentor aktivieren – erst nach trockenem Test"
+      "caption": "LCN-GT2 Garagentor aktivieren (C2 KURZ ZU / LANG AUF)"
     },
     {
       "type": "SelectInstance",

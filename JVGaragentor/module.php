@@ -55,6 +55,7 @@ class JVGaragentor extends IPSModuleStrict
         $this->SetTimerInterval('Monitor', 1000);
         $this->LCNApplyChanges();
         $this->Monitor();
+        $this->LCNScheduleCommission();
     }
 
     /** Derselbe Eingang für Kachel, Skripte, später LCN-GT2: JVG_Command(id, 'ZU'). */

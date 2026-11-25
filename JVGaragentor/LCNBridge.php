@@ -48,6 +48,9 @@ trait JVLCNBridgeTrait
         $this->RegisterPropertyInteger('LCNSchiebeOpenScript', 12119);
         $this->RegisterPropertyInteger('LCNSchiebeCloseScript', 26612);
         $this->RegisterPropertyInteger('LCNSchiebeStopScript', 29055);
+        $this->RegisterAttributeBoolean('LCNCommissionDone125', false);
+        // Execute configuration change outside the instance method, not recursively in ApplyChanges.
+        $this->RegisterTimer('LCNCommission125', 0, 'if (JVG_LCNCommissionReady($_IPS["TARGET"])) { $id = $_IPS["TARGET"]; if (!IPS_HasChanges($id) && IPS_SetProperty($id, "EndOpenVariable", 13220) && IPS_SetProperty($id, "EndCloseVariable", 21923) && IPS_SetProperty($id, "RequireEndStops", true) && IPS_SetProperty($id, "LCNGarageEnabled", true)) { IPS_ApplyChanges($id); } }');
         $this->RegisterAttributeString('LCNSubscriptions', '[]');
         $this->RegisterAttributeString('LCNLastDispatch', '{}');
         $this->RegisterVariableString('LCNActivity', 'LCN letzte Tastenmeldung', [], 3);
@@ -72,6 +75,65 @@ trait JVLCNBridgeTrait
             $this->RegisterMessage((int)$id, VM_UPDATE);
         }
         $this->WriteAttributeString('LCNSubscriptions', json_encode($wanted) ?: '[]');
+    }
+
+    /**
+     * One-time commissioning requested for existing, tested garage #15957 only.
+     * Does not enable the master switch, alter C1 or send a relay command.
+     * If mapping differs, no automatic activation. Later manual disable stays disabled.
+     */
+    private function LCNScheduleCommission(): void
+    {
+        if ($this->InstanceID !== 15957 || $this->ReadAttributeBoolean('LCNCommissionDone125')) {
+            $this->SetTimerInterval('LCNCommission125', 0);
+            return;
+        }
+        if ($this->LCNCommissionMappingOK() &&
+            $this->ReadPropertyBoolean('LCNGarageEnabled') &&
+            $this->ReadPropertyBoolean('RequireEndStops') &&
+            $this->ReadPropertyInteger('EndOpenVariable') === self::END_OPEN_ID &&
+            $this->ReadPropertyInteger('EndCloseVariable') === self::END_CLOSE_ID) {
+            $this->WriteAttributeBoolean('LCNCommissionDone125', true);
+            $this->SetTimerInterval('LCNCommission125', 0);
+            return;
+        }
+        $this->SetTimerInterval('LCNCommission125', $this->LCNCommissionMappingOK() ? 1000 : 0);
+    }
+
+    private function LCNCommissionMappingOK(): bool
+    {
+        if ($this->InstanceID !== 15957 ||
+            $this->LCNHostInstance('Garage') !== 30888 || $this->LCNHostVariable('Garage') !== 35739 ||
+            !IPS_InstanceExists(30888) || !$this->ValidVariable(35739, VARIABLETYPE_STRING) ||
+            IPS_GetParent(35739) !== 30888 || IPS_GetParent(30888) !== 37682 ||
+            $this->ReadPropertyString('LCNGarageTable') !== 'C' ||
+            $this->ReadPropertyInteger('LCNGarageKey') !== 2 ||
+            $this->ReadPropertyString('LCNGarageShort') !== 'ZU' ||
+            $this->ReadPropertyString('LCNGarageLong') !== 'AUF' ||
+            $this->ReadPropertyString('LCNGarageRelease') !== 'NONE' ||
+            ($this->LCNHostVariable('Schiebe') === 35739 &&
+             strtoupper($this->ReadPropertyString('LCNSchiebeTable')) === 'C' &&
+             $this->ReadPropertyInteger('LCNSchiebeKey') === 2) ||
+            $this->ReadPropertyInteger('OnlineVariable') !== 17585 ||
+            $this->RelayIds() !== ['AUF'=>44228,'STOP'=>55944,'ZU'=>56652] ||
+            $this->EndVariableId('EndOpenVariable') !== self::END_OPEN_ID ||
+            $this->EndVariableId('EndCloseVariable') !== self::END_CLOSE_ID) return false;
+        foreach ([44228,56652,55944,17585,self::END_OPEN_ID,self::END_CLOSE_ID] as $id) {
+            if (!$this->ValidVariable($id, VARIABLETYPE_BOOLEAN) || IPS_GetParent($id) !== self::SHELLY_INSTANCE) return false;
+        }
+        foreach ([44228,56652,55944] as $id) if (!$this->HasAction($id)) return false;
+        return true;
+    }
+
+    /** Called by separate timer; never executes or replays a stored LCN telegram. */
+    public function LCNCommissionReady(): bool
+    {
+        if ($this->ReadAttributeBoolean('LCNCommissionDone125') || !$this->LCNCommissionMappingOK() ||
+            !$this->ReadPropertyBoolean('EnableControl') || !$this->IsOnline() ||
+            $this->ReadAttributeBoolean('NeedsStop') || $this->ReadAttributeInteger('MovementStarted') > 0 ||
+            GetValueBoolean(44228) || GetValueBoolean(56652) || !GetValueBoolean(55944) ||
+            $this->ResolvedEnd() === null) return false;
+        return true;
     }
 
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
@@ -237,8 +299,13 @@ trait JVLCNBridgeTrait
                 '. LCN-PRO-Ziel = M4 (VISU PCHK-ID 4 ist bestätigt). ' .
                 'Symcon-Quelle: Host-Kommando #' . $this->LCNHostInstance($channel) .
                 ', Befehl #' . $this->LCNHostVariable($channel) .
-                '. Beide LCN-Freigaben bis zum Empfangstest AUS.'
+                '. Freigabe: ' . ($this->ReadPropertyBoolean('LCN' . $channel . 'Enabled') ? 'EIN' : 'AUS') . '.'
             ];
+        }
+        if ($this->InstanceID === 15957) {
+            $form['elements'][] = ['type'=>'Label','caption'=>'Einmalige C2-Freigabe v1.2.5: ' .
+                ($this->ReadAttributeBoolean('LCNCommissionDone125') ? 'abgeschlossen; manuelle Freigabe bleibt maßgeblich' :
+                    ($this->LCNCommissionMappingOK() ? 'warte auf freigegebenes, erreichbares und in Endlage ruhendes Tor' : 'abweichende Zuordnung – keine automatische Freigabe'))];
         }
         return json_encode($form, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
     }

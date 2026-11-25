@@ -463,4 +463,63 @@ $GLOBALS['simLCNParents'][35739] = 1234;
 $realLCN->ApplyChanges();
 check(!isset($realLCN->messages[35739]),
     'Automatische Quellwahl fällt bei abweichender Elterninstanz sicher weg');
+// Reales Shelly-Setup: beide bestätigten Eingänge statt Ausgangsstatus.
+resetHardware();
+$GLOBALS['simLCNParents'] = [44228=>22849,56652=>22849,55944=>22849,17585=>22849,13220=>22849,21923=>22849];
+mkVar(13220, VARIABLETYPE_BOOLEAN, false, false);
+mkVar(21923, VARIABLETYPE_BOOLEAN, true, false);
+$realGate = new JVGaragentor();
+$realGate->Create();
+check($realGate->props['EndOpenVariable'] === 13220 && $realGate->props['EndCloseVariable'] === 21923,
+    'Bestätigte Eingangsstatus-IDs bei Neuanlage vorbelegt');
+$realGate->ApplyChanges();
+check($realGate->values['Position'] === 'ZU' && $realGate->values['Signal'] === 0,
+    'Realer Eingang ZU bei Start, ohne künstliches Nachleuchten');
+$realGate->props['EndOpenVariable'] = 0;
+$realGate->props['EndCloseVariable'] = 0;
+$realGate->ApplyChanges();
+check($realGate->values['Position'] === 'ZU','Alte Nullwerte: bestätigte Eingänge automatisch erkannt');
+$GLOBALS['simVars'][44228]['value'] = true;
+$realGate->Monitor();
+check($realGate->values['Position'] === 'ZU','Ausgang AUF wird nicht als Endlage ausgewertet');
+$GLOBALS['simVars'][44228]['value'] = false;
+$GLOBALS['simVars'][21923]['value'] = false;
+$realGate->Monitor();
+check($realGate->values['Position'] === 'GESTOPPT','Zwischenposition ohne Fahrbefehl nicht als Endlage ausgegeben');
+$GLOBALS['simVars'][13220]['value'] = true;
+$realGate->Monitor();
+check($realGate->values['Position'] === 'AUF' && $realGate->values['Signal'] === 2,
+    'Realer SW2 ergibt AUF und Grün');
+$realGate->attrs['SignalUntil'] = time()-1;
+$realGate->Monitor();
+check($realGate->values['Position'] === 'AUF' && $realGate->values['Signal'] === 0,
+    'Nachleuchtzeit endet, AUF bleibt');
+$GLOBALS['simVars'][13220]['value'] = false;
+$GLOBALS['simVars'][21923]['value'] = true;
+$realGate->Monitor();
+check($realGate->values['Position'] === 'ZU' && $realGate->values['Signal'] === 4,
+    'Realer SW1 ergibt ZU und Rot');
+$realGate->props['EndOpenVariable'] = 44228;
+$realGate->props['EnableControl'] = true;
+$realGate->Monitor();
+check($realGate->values['Position'] === 'GESTOPPT' && $realGate->values['Signal'] === 0,
+    'Falsch eingetragener Relaisstatus ergibt keine Endlage');
+$before = count($GLOBALS['simActions']);
+check(!$realGate->Command('AUF') && count($GLOBALS['simActions']) === $before,
+    'Relaisstatus als Endlage sperrt Fahrbefehl');
+$realGate->props['EndOpenVariable'] = 21923;
+$realGate->props['EndCloseVariable'] = 13220;
+$realGate->Monitor();
+check($realGate->values['Position'] === 'GESTOPPT' && !$realGate->Command('AUF'),
+    'Vertauschte bekannte Endlagen sperren Fahrbefehl');
+$realGate->props['EndOpenVariable'] = 0;
+$realGate->props['EndCloseVariable'] = 0;
+$GLOBALS['simLCNParents'][13220] = 999;
+$realGate->Monitor();
+check($realGate->values['Position'] === 'GESTOPPT' && !$realGate->Command('AUF'),
+    'Keine automatische Zuordnung bei falscher Elterninstanz');
+$GLOBALS['simLCNParents'][13220] = 22849;
+$realGate->Monitor();
+check($realGate->values['Position'] === 'ZU' && $realGate->values['Signal'] === 0,
+    'Wiederhergestellte Zuordnung zeigt bestätigte Endlage ohne Schein-Nachleuchten');
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

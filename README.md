@@ -53,7 +53,7 @@ Shelly Pro 3 Garagentor: Instanz **22849**, IP `192.168.103.73`.
 | STOP | O3, `Status 2` | **55944** | AUS, Auto-ON nach 1 s |
 | Erreichbar | – | **17585** | Boolean |
 
-**Die zwei Endlagen-IDs fehlen weiterhin.** Sie müssen jeweils eine Boolean-Variable darstellen, die **TRUE** meldet, wenn die zugehörige Endlage erreicht ist. Keines der vorhandenen Shelly-Eingangssignale ist bisher als Endlage bestätigt. Deshalb bleiben Fahrbefehle ohne eindeutige Endlagensignale standardmäßig gesperrt.
+**Bestätigt am 25.11.2026:** Shelly-Instanz 22849, Endlage AUF: SW2 / `Eingangsstatus 1` **13220**, Endlage ZU: SW1 / `Eingangsstatus` **21923**. Beide sind Boolean (TRUE bei erreichter Endlage). Ab v1.2.2 sind diese IDs vorbelegt. Bei bestehenden Instanzen mit gespeicherten Nullwerten wird das bestätigte Paar nur bei passender Relais-/Online-Zuordnung und überprüfter Elterninstanz automatisch verwendet. Explizite abweichende Zuordnungen werden nicht überschrieben; ungültige, doppelte, vertauschte bekannte IDs oder Relais-/Online-IDs werden nicht als Endlage ausgewertet. Fahrbefehle ohne gültige Rückmeldungen bleiben bei aktivierter Endlagensperre gesperrt.
 
 ## WLED-Ampel
 
@@ -98,7 +98,7 @@ GitHub Actions prüft zusätzlich JSON und die JavaScript-Syntax. Reale Endlagen
 - Vorbelegt: WLED Garage vorne Presets **46199**, Ein/Aus **29605**; hinten synchronisiert geräteseitig.
 - Die **Ampel-Signal-Variable** wird automatisch aus der **einzigen** JVGaragentor-Instanz ermittelt. Ihre Objekt-ID ist erst nach Erstellung dieser Instanz bekannt. Die Verbindung wird auch dann gefunden, wenn die Torinstanz später angelegt wird (10-Sekunden-Timer).
 - Bei mehreren Torinstanzen oder einer bewusst gesetzten, aber ungültigen manuellen Variable erfolgt **keine** automatische Wahl irgendeiner Quelle.
-- **Nicht automatisch belegbar:** Endlage AUF und Endlage ZU – echte, eindeutige Rückmeldungen der CS320 fehlen bisher; Standard-Sicherheitssperre bleibt aktiv. Fahrbefehle erst nach realer Prüfung freigeben.
+- Vorbelegt und anhand realer Endlagen bestätigt: AUF **13220**, ZU **21923**. Fahrbefehle erst nach realer Prüfung freigeben; die Standard-Sicherheitssperre bleibt aktiv.
 - **Keine Doppelung der Zeiten:** 120/10/5 Sekunden und Smartphone-Puls stehen im Konfigurationsformular von **JVGaragentor (Torsteuerung)**. JVAmpel hat keine eigenen Zeitwerte.
 
 ## Fehlerkorrektur v1.1.2 – Torsteuerungsinstanz im Instanzdialog

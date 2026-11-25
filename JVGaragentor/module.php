@@ -11,6 +11,10 @@ class JVGaragentor extends IPSModuleStrict
     private const OPENING = 'LÄUFT AUF';
     private const CLOSING = 'LÄUFT ZU';
     private const STOPPED = 'GESTOPPT';
+    private const END_OPEN_ID = 13220;  // SW2, Eingangsstatus 1
+    private const END_CLOSE_ID = 21923; // SW1, Eingangsstatus
+    private const SHELLY_INSTANCE = 22849;
+    private const END_CONFIG_WARNING = 'Endlagen fehlen oder sind falsch zugeordnet – Eingangsstatus prüfen.';
 
     public function Create(): void
     {
@@ -21,8 +25,8 @@ class JVGaragentor extends IPSModuleStrict
         $this->RegisterPropertyInteger('RelayCloseVariable', 56652);
         $this->RegisterPropertyInteger('RelayStopVariable', 55944);
         $this->RegisterPropertyInteger('OnlineVariable', 17585);
-        $this->RegisterPropertyInteger('EndOpenVariable', 0);
-        $this->RegisterPropertyInteger('EndCloseVariable', 0);
+        $this->RegisterPropertyInteger('EndOpenVariable', self::END_OPEN_ID);
+        $this->RegisterPropertyInteger('EndCloseVariable', self::END_CLOSE_ID);
         $this->RegisterPropertyBoolean('RequireEndStops', true);
         $this->RegisterPropertyInteger('MovementTimeoutSeconds', 120); // Harte Obergrenze auch bei Konfigurationsfehler 120 s
         $this->RegisterPropertyInteger('OpenHoldSeconds', 10);
@@ -168,6 +172,20 @@ class JVGaragentor extends IPSModuleStrict
         $this->CheckPulse();
         $open = $this->EndSignal('EndOpenVariable');
         $closed = $this->EndSignal('EndCloseVariable');
+        if ($this->ReadPropertyBoolean('RequireEndStops') && ($open === null || $closed === null)) {
+            // Ohne gültiges Eingangspaar niemals eine alte oder falsche Endlage anzeigen.
+            if ($this->ReadAttributeInteger('MovementStarted') > 0) {
+                $this->WriteAttributeBoolean('NeedsStop', true);
+            }
+            $this->WriteAttributeInteger('MovementStarted', 0);
+            $this->WriteAttributeBoolean('StateInitialized', false);
+            $this->UpdateGateState(self::STOPPED, 0);
+            $this->SetWarning(self::END_CONFIG_WARNING);
+            return;
+        }
+        if ((string)$this->GetValue('Hinweis') === self::END_CONFIG_WARNING) {
+            $this->SetWarning('');
+        }
         if ($open === true && $closed === true) {
             $this->WriteAttributeInteger('MovementStarted', 0);
             $this->WriteAttributeBoolean('NeedsStop', true);
@@ -305,10 +323,34 @@ class JVGaragentor extends IPSModuleStrict
         return null;
     }
 
-    private function EndSignal(string $property): ?bool
+    /** Alte Instanzen mit gespeicherten 0-Werten nur für das bestätigte Garagen-Setup ergänzen. */
+    private function EndVariableId(string $property): int
     {
         $id = $this->ReadPropertyInteger($property);
-        return $this->ValidVariable($id, VARIABLETYPE_BOOLEAN) ? GetValueBoolean($id) : null;
+        if ($id !== 0) return $id;
+        $ids = $this->RelayIds();
+        if ($ids['AUF'] !== 44228 || $ids['ZU'] !== 56652 || $ids['STOP'] !== 55944 ||
+            $this->ReadPropertyInteger('OnlineVariable') !== 17585) return 0;
+        foreach ([44228, 56652, 55944, 17585, self::END_OPEN_ID, self::END_CLOSE_ID] as $known) {
+            if (!$this->ValidVariable($known, VARIABLETYPE_BOOLEAN) ||
+                IPS_GetParent($known) !== self::SHELLY_INSTANCE) return 0;
+        }
+        return $property === 'EndOpenVariable' ? self::END_OPEN_ID : self::END_CLOSE_ID;
+    }
+
+    private function EndSignal(string $property): ?bool
+    {
+        $id = $this->EndVariableId($property);
+        $other = $this->EndVariableId($property === 'EndOpenVariable' ? 'EndCloseVariable' : 'EndOpenVariable');
+        // Ausgangsstatus, Online-Status, doppelte oder vertauschte bekannte Endlagen ablehnen.
+        if (!$this->ValidVariable($id, VARIABLETYPE_BOOLEAN) || $id === $other ||
+            in_array($id, array_values($this->RelayIds()), true) ||
+            in_array($id, [44228, 56652, 55944, 17585, $this->ReadPropertyInteger('OnlineVariable')], true)) return null;
+        if (in_array($id, [self::END_OPEN_ID, self::END_CLOSE_ID], true)) {
+            $expected = $property === 'EndOpenVariable' ? self::END_OPEN_ID : self::END_CLOSE_ID;
+            if ($id !== $expected || IPS_GetParent($id) !== self::SHELLY_INSTANCE) return null;
+        }
+        return GetValueBoolean($id);
     }
 
     private function RelayIds(): array

@@ -2,11 +2,11 @@
   "elements": [
     {
       "type": "Label",
-      "caption": "VOREINGESTELLT: beide Tore benutzen dieselbe Host-Instanz 30888 und dieselbe Stringvariable 35739. C1 kurz/lang = Schiebetor ZU/AUF, C2 kurz/lang = Garagentor ZU/AUF. Endlagen sind noch unbekannt und daher nicht vorbelegt."
+      "caption": "VOREINGESTELLT: beide Tore benutzen dieselbe Host-Instanz 30888 und dieselbe Stringvariable 35739. C1 kurz/lang = Schiebetor ZU/AUF, C2 kurz/lang = Garagentor ZU/AUF. Bestätigte Endlagen: AUF 13220 (SW2), ZU 21923 (SW1)."
     },
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.2.1 – LCN-M51 Host-Kommando bereits vorbelegt (Instanz 30888, Befehl 35739). Beide LCN-Tastenkanäle bleiben bis zum Empfangstest ausgeschaltet."
+      "caption": "JV Garagentor v1.2.2 – LCN-M51 Host-Kommando bereits vorbelegt (Instanz 30888, Befehl 35739). Beide LCN-Tastenkanäle bleiben bis zum Empfangstest ausgeschaltet."
     },
     {
       "type": "CheckBox",
@@ -36,12 +36,22 @@
     {
       "type": "SelectVariable",
       "name": "EndOpenVariable",
-      "caption": "Endlage AUF (Boolean, TRUE bei Endlage; noch zu verdrahten)"
+      "caption": "Endlage AUF – SW2, Eingangsstatus 1, ID 13220 (TRUE = AUF)",
+      "validVariableTypes": [
+        0
+      ]
     },
     {
       "type": "SelectVariable",
       "name": "EndCloseVariable",
-      "caption": "Endlage ZU (Boolean, TRUE bei Endlage; noch zu verdrahten)"
+      "caption": "Endlage ZU – SW1, Eingangsstatus, ID 21923 (TRUE = ZU)",
+      "validVariableTypes": [
+        0
+      ]
+    },
+    {
+      "type": "Label",
+      "caption": "Bestehende Instanz: leere Endlagenfelder (0) werden nur beim bestätigten Shelly #22849 mit passender Relaiszuordnung automatisch ausgewertet. Für sichtbar gespeicherte IDs beide Felder auswählen. Status/Status 1/Status 2 sind ausschließlich Fahrbefehle."
     },
     {
       "type": "CheckBox",

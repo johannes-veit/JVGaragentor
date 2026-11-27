@@ -240,7 +240,13 @@ trait JVLCNBridgeTrait
 
         if ($channel === 'Garage') {
             // Gleiche Prüfung wie in der Visualisierung, niemals Bypass.
-            $ok = $this->Command($action);
+            // The configured garage short=ZU becomes STOP during real motion,
+            // or if motion cannot be excluded. C1/Schiebetor is unchanged.
+            if ($hit['gesture'] === 'KURZ' && $action === 'ZU' && $this->MotionHost() !== '') {
+                $ok = $this->CommandInternal($action, true, $action);
+            } else {
+                $ok = $this->Command($action);
+            }
         } else {
             $script = $this->ReadPropertyInteger('LCNSchiebe' .
                 match($action) {'AUF'=>'OpenScript','ZU'=>'CloseScript','STOP'=>'StopScript'});

@@ -2,11 +2,16 @@
   "elements": [
     {
       "type": "Label",
-      "caption": "VOREINGESTELLT: beide Tore benutzen dieselbe Host-Instanz 30888 und dieselbe Stringvariable 35739. C1 kurz/lang = Schiebetor ZU/AUF, C2 kurz/lang = Garagentor ZU/AUF. Bestätigte Endlagen: AUF 13220 (SW2), ZU 21923 (SW1)."
+      "caption": "VOREINGESTELLT: beide Tore benutzen dieselbe Host-Instanz 30888 und dieselbe Stringvariable 35739. C1 kurz/lang = Schiebetor ZU/AUF, C2 kurz/lang = Garagentor STOP bei Fahrt, sonst ZU / AUF. Bestätigte Endlagen: AUF 13220 (SW2), ZU 21923 (SW1)."
     },
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.2.7 – C2-Ereigniswert direkt auswerten, bekannte alte Status-/Endlagenverwechslungen bei Instanz #15957 korrigieren."
+      "caption": "JV Garagentor v1.2.9 – tatsächliche Fahrtrichtung aus EM 172 / Shelly i4; automatische Vorbelegung für bestehende Instanz #15957."
+    },
+    {
+      "type": "ValidationTextBox",
+      "name": "MotionFeedbackHost",
+      "caption": "Fahrtrichtung: auto = vorhandene Garage #15957 / i4 .93; alternativ IP, off = alter Modus"
     },
     {
       "type": "CheckBox",

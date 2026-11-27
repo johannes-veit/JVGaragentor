@@ -3,11 +3,13 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/LCNTasten.php';
 require_once __DIR__ . '/LCNBridge.php';
+require_once __DIR__ . '/MotionFeedback.php';
 
 /** JVGaragentor: Fahrbefehle über Shelly Pro 3; Endlagen-/Laufzeit-Status. */
 class JVGaragentor extends IPSModuleStrict
 {
     use JVLCNBridgeTrait;
+    use JVMotionFeedbackTrait;
     private const OPENING = 'LÄUFT AUF';
     private const CLOSING = 'LÄUFT ZU';
     private const STOPPED = 'GESTOPPT';
@@ -21,6 +23,7 @@ class JVGaragentor extends IPSModuleStrict
         parent::Create();
         $this->RegisterPropertyBoolean('EnableControl', false);
         $this->LCNCreate();
+        $this->MotionCreate();
         $this->RegisterPropertyInteger('RelayOpenVariable', 44228);
         $this->RegisterPropertyInteger('RelayCloseVariable', 56652);
         $this->RegisterPropertyInteger('RelayStopVariable', 55944);
@@ -52,7 +55,7 @@ class JVGaragentor extends IPSModuleStrict
         }
         $this->RegisterVariableString('Hinweis', 'Steuerung / Diagnose', [], 1);
         $this->RegisterVariableInteger('Signal', 'Ampel-Signal', [], 2);
-        $this->SetTimerInterval('Monitor', 1000);
+        $this->SetTimerInterval('Monitor', $this->MotionHost() !== '' ? 500 : 1000);
         $this->LCNApplyChanges();
         $this->Monitor();
         $this->LCNScheduleCommission();
@@ -60,6 +63,11 @@ class JVGaragentor extends IPSModuleStrict
 
     /** Derselbe Eingang für Kachel, Skripte, später LCN-GT2: JVG_Command(id, 'ZU'). */
     public function Command(string $command): bool
+    {
+        return $this->CommandInternal($command);
+    }
+
+    private function CommandInternal(string $command, bool $short = false, ?string &$actual = null): bool
     {
         if (!in_array($command, ['AUF', 'STOP', 'ZU'], true)) {
             throw new InvalidArgumentException('Ungültiger Torbefehl');
@@ -82,6 +90,26 @@ class JVGaragentor extends IPSModuleStrict
                 $this->SetWarning('Shelly-Relaisvariablen fehlen oder sind nicht schaltbar.');
                 return false;
             }
+        }
+        $feedback = $this->MotionHost() !== '';
+        if ($feedback && ($command !== 'STOP' || $short)) {
+            // Read fresh direction for every decision, including an external drive
+            // that started since the last timer tick.
+            $this->MotionMonitor();
+            if ($short && (!$this->ReadAttributeBoolean('MotionFeedbackOK') ||
+                in_array((string)$this->GetValue('Position'), [self::OPENING, self::CLOSING], true) ||
+                $this->ReadAttributeInteger('MotionPendingUntil') > time())) {
+                $command = 'STOP';
+            }
+        }
+        $actual = $command;
+        if ($feedback && $command !== 'STOP' && !$this->ReadAttributeBoolean('MotionFeedbackOK')) {
+            $this->SetWarning(self::MOTION_WARNING . 'Keine gültige Rückmeldung – Fahrbefehl gesperrt.');
+            return false;
+        }
+        if ($feedback && $command !== 'STOP' && $this->ReadAttributeInteger('MotionPendingUntil') > time()) {
+            $this->SetWarning(self::MOTION_WARNING . 'Warte auf Fahrtrückmeldung – nur STOP möglich.');
+            return false;
         }
         $endOpen = $this->EndSignal('EndOpenVariable');
         $endClose = $this->EndSignal('EndCloseVariable');
@@ -140,6 +168,12 @@ class JVGaragentor extends IPSModuleStrict
         }
         $this->WriteAttributeInteger('PulseSentAt', time());
         $this->WriteAttributeInteger('PulseVariable', $relay);
+        if ($feedback) {
+            // No optimistic lamp state; feedback confirms actual movement/stop.
+            $this->WriteAttributeInteger('MotionPendingUntil', $command === 'STOP' ? 0 : time() + 3);
+            $this->Broadcast();
+            return true;
+        }
         if ($command === 'STOP') {
             $this->WriteAttributeBoolean('NeedsStop', false);
             $this->WriteAttributeInteger('MovementStarted', 0);
@@ -172,6 +206,10 @@ class JVGaragentor extends IPSModuleStrict
     public function Monitor(): void
     {
         $this->CheckPulse();
+        if ($this->MotionHost() !== '') {
+            $this->MotionMonitor();
+            return;
+        }
         $open = $this->EndSignal('EndOpenVariable');
         $closed = $this->EndSignal('EndCloseVariable');
         if ($this->ReadPropertyBoolean('RequireEndStops') && ($open === null || $closed === null)) {
@@ -398,7 +436,7 @@ class JVGaragentor extends IPSModuleStrict
         $deadline = 0;
         if (in_array($signal, [1, 3], true)) {
             $started = $this->ReadAttributeInteger('MovementStarted');
-            $deadline = $started > 0 ? $started + $this->MovementTimeout() : 0;
+            $deadline = $this->MotionHost() !== '' ? 0 : ($started > 0 ? $started + $this->MovementTimeout() : 0);
         } elseif (in_array($signal, [2, 4], true)) {
             $deadline = $this->ReadAttributeInteger('SignalUntil');
         }
@@ -409,7 +447,9 @@ class JVGaragentor extends IPSModuleStrict
             'blinkPeriodMs' => min(4000, max(500, $this->ReadPropertyInteger('BlinkPeriodMs'))),
             'warning' => $diagnostic,
             'enabled' => $this->ReadPropertyBoolean('EnableControl'),
-            'ready' => !$requiredEndStopsMissing && !$this->ReadAttributeBoolean('NeedsStop'),
+            'ready' => !$requiredEndStopsMissing && !$this->ReadAttributeBoolean('NeedsStop') &&
+                ($this->MotionHost() === '' || ($this->ReadAttributeBoolean('MotionFeedbackOK') &&
+                    $this->ReadAttributeInteger('MotionPendingUntil') <= time())),
             'online' => $this->IsOnline()
         ];
     }

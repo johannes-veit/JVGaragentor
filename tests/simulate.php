@@ -635,7 +635,7 @@ $GLOBALS['simLCNModules']=[30888];
 $GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,44228=>22849,56652=>22849,55944=>22849,17585=>22849,13220=>22849,21923=>22849];
 mkVar(35739,VARIABLETYPE_STRING,'034001',false);
 mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);mkVar(21923,VARIABLETYPE_BOOLEAN,true,false);
-$commission=new JVGaragentor();$commission->InstanceID=15957;$commission->Create();
+$commission=new JVGaragentor();$commission->InstanceID=15957;$commission->Create();$commission->props['MotionFeedbackHost']='off';
 $commission->props['EnableControl']=true;$commission->props['EndOpenVariable']=0;$commission->props['EndCloseVariable']=0;
 $commission->props['RequireEndStops']=false;$commission->props['LCNSchiebeEnabled']=true;
 $commission->ApplyChanges();
@@ -672,7 +672,7 @@ $GLOBALS['simLCNModules']=[30888];
 $GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,44228=>22849,56652=>22849,55944=>22849,17585=>22849,13220=>22849,21923=>22849];
 mkVar(35739,VARIABLETYPE_STRING,'034000',false);
 mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);mkVar(21923,VARIABLETYPE_BOOLEAN,true,false);
-$repair=new JVGaragentor();$repair->InstanceID=15957;$repair->Create();
+$repair=new JVGaragentor();$repair->InstanceID=15957;$repair->Create();$repair->props['MotionFeedbackHost']='off';
 $repair->props['EnableControl']=true;$repair->props['EndOpenVariable']=44228;$repair->props['EndCloseVariable']=56652;
 $repair->ApplyChanges();
 check($repair->values['Position']==='ZU','Bekannte Status-Verwechslung korrigiert: Endlage aus Eingangsstatus');
@@ -690,4 +690,80 @@ $repair->MessageSink(time(),35739,VM_UPDATE,[]);
 check(count($GLOBALS['simActions'])===$before,'Fehlende Ereignisdaten spielen keinen gespeicherten Befehl ab');
 $other=new JVGaragentor();$other->Create();$other->props['EndOpenVariable']=44228;$other->props['EndCloseVariable']=56652;$other->props['EnableControl']=true;$other->ApplyChanges();
 check(!$other->Command('AUF'),'Fremde Instanz mit Status statt Eingangsstatus bleibt gesperrt');
+
+// EM 172 direction feedback: test the actual module with a mocked HTTP response.
+class MotionTestGate extends JVGaragentor {
+    public ?array $motionDoc = null;
+    public array $motionHosts = [];
+    protected function MotionHttpStatus(string $host): ?array {
+        $this->motionHosts[] = $host;
+        return $this->motionDoc;
+    }
+    public function feedback(bool $up, bool $down): void {
+        $this->motionDoc = ['sys'=>['mac'=>'80B54E267EC0'],
+            'input:0'=>['id'=>0,'state'=>$up], 'input:1'=>['id'=>1,'state'=>$down]];
+    }
+}
+resetHardware();
+$GLOBALS['simLCNModules']=[30888];
+$GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,44228=>22849,56652=>22849,55944=>22849,17585=>22849,13220=>22849,21923=>22849];
+mkVar(35739,VARIABLETYPE_STRING,'034002',false);
+mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);
+mkVar(21923,VARIABLETYPE_BOOLEAN,true,false);
+$m=new MotionTestGate();$m->InstanceID=15957;$m->Create();
+$m->props['EnableControl']=true;$m->props['LCNGarageEnabled']=true;
+$m->feedback(false,false);$m->ApplyChanges();
+check($m->props['MotionFeedbackHost']==='auto' && end($m->motionHosts)==='192.168.103.93','Migration: i4 automatic without reconfiguration');
+check($m->values['Position']==='ZU' && $m->values['Signal']===0 && count($GLOBALS['simActions'])===0,'Startup idle no replay/no relay');
+$m->feedback(true,false);$m->Monitor();
+check($m->values['Position']==='LÄUFT AUF' && $m->values['Signal']===1,'External AUF even while departing end contact remains on');
+check(count($GLOBALS['simActions'])===0,'External motion detected without relay command');
+$GLOBALS['simVars'][21923]['value']=false;
+check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'C2 short during external opening sends STOP');
+check($m->values['Signal']===1,'STOP command not mistaken for actual standstill');
+$GLOBALS['simVars'][55944]['value']=true;
+$m->feedback(false,false);$m->Monitor();
+check($m->values['Position']==='GESTOPPT' && $m->values['Signal']===0,'Actual intermediate stop');
+$m->attrs['LCNLastDispatch']='{}';
+check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[56652,true],'C2 short at standstill sends close');
+check($m->values['Signal']===0,'No optimistic movement after accepted command');
+$GLOBALS['simVars'][56652]['value']=false;
+$m->attrs['LCNLastDispatch']='{}';
+check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'Short while command pending sends STOP');
+$GLOBALS['simVars'][55944]['value']=true;
+$m->feedback(false,true);$m->Monitor();
+check($m->values['Position']==='LÄUFT ZU' && $m->values['Signal']===3,'External ZU signal');
+$m->attrs['LCNLastDispatch']='{}';
+check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'C2 short during external closing sends STOP');
+$GLOBALS['simVars'][55944]['value']=true;
+$m->feedback(true,false);$m->Monitor();
+check($m->values['Signal']===1,'External reversal from closing to opening');
+$m->attrs['MovementStarted']=time()-130;$m->Monitor();
+check($m->values['Signal']===1 && $m->attrs['NeedsStop'],'Timeout does not fake stop while motion proven');
+$m->feedback(false,false);$GLOBALS['simVars'][13220]['value']=true;$m->Monitor();
+check($m->values['Position']==='AUF' && $m->values['Signal']===2,'End AUF green after external drive');
+$m->attrs['SignalUntil']=time()-1;$m->Monitor();
+check($m->values['Signal']===0 && $m->values['Position']==='AUF','Existing hold time retained');
+$GLOBALS['simVars'][13220]['value']=false;
+$m->feedback(false,true);$m->Monitor();$m->feedback(false,false);$GLOBALS['simVars'][21923]['value']=true;$m->Monitor();
+check($m->values['Signal']===4 && $m->values['Position']==='ZU','End ZU red after external drive');
+$GLOBALS['simVars'][21923]['value']=false;
+$m->feedback(true,true);$m->Monitor();
+check(!$m->attrs['MotionFeedbackOK'] && $m->values['Signal']===0,'Conflicting feedback disables amp signal');
+$before=count($GLOBALS['simActions']);
+check(!$m->Command('ZU') && count($GLOBALS['simActions'])===$before,'Invalid feedback blocks movement');
+$m->attrs['LCNLastDispatch']='{}';
+check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'Short with invalid feedback only sends STOP');
+$GLOBALS['simVars'][55944]['value']=true;
+$m->motionDoc=null;$m->Monitor();
+check(!$m->attrs['MotionFeedbackOK'] && $m->values['Signal']===0,'Lost i4 cannot display stale movement or green');
+$m->feedback(false,true);$m->Monitor();
+check($m->attrs['MotionFeedbackOK'] && $m->values['Signal']===3,'Recovery during motion restores signal');
+$m->motionDoc['sys']['mac']='000000000000';$m->Monitor();
+check(!$m->attrs['MotionFeedbackOK'],'Wrong device at configured IP rejected');
+$m->feedback(false,false);$m->motionDoc['input:0']['state']=null;$m->Monitor();
+check(!$m->attrs['MotionFeedbackOK'],'Null is not standstill');
+$m->feedback(false,false);$m->Monitor();$m->attrs['LCNLastDispatch']='{}';
+check($m->ProcessLCNInput(35739,'034001') && end($GLOBALS['simActions'])===[44228,true],'C2 long unchanged: AUF');
+
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

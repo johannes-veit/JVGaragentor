@@ -1,3 +1,7 @@
+## v1.2.9 – EM 172 / reale Fahrtrichtung
+
+Bestehende Garageninstanz #15957: lokale Shelly-i4-Rückmeldung automatisch über 192.168.103.93, SW1/ID 0 = AUF, SW2/ID 1 = ZU. Abfrage gemeinsam alle 500 ms, vor LCN-KURZ frisch. Die WLED-Signalvariable wird aus tatsächlicher Bewegung und vorhandenen Endlagen gebildet, nicht aus gesendeten Befehlen. Keine Änderungen an Relais-IDs, Freigaben, WLED-Presets oder Nachleuchtzeiten. Zwischenstopp = Signal 0. Bei ungültiger Rückmeldung keine Fahrt, KURZ = STOP; bei nachgewiesenem Stillstand KURZ = ZU, LANG weiterhin AUF. C1 bleibt unverändert. Kein automatischer Fahrimpuls beim Update. Fremde Instanzen bleiben im Altmodus, bis eine IP explizit konfiguriert wird. Die Rückmeldung dient der Anzeige/Bedienlogik und ersetzt keine Sicherheitsfunktion der CS320. Vor Ort mit intakten Sicherheitseinrichtungen prüfen.
+
 # JV Garagentor v1.2.1 – IP-Symcon 9.0
 
 Eigenständige IP-Symcon-Bibliothek mit **zwei getrennten Gerätemodulen**:

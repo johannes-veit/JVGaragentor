@@ -699,8 +699,9 @@ class MotionTestGate extends JVGaragentor {
         $this->motionHosts[] = $host;
         return $this->motionDoc;
     }
+    protected function MotionExpectedMacHash(): string { return hash('sha256','020000000001'); }
     public function feedback(bool $up, bool $down): void {
-        $this->motionDoc = ['sys'=>['mac'=>'80B54E267EC0'],
+        $this->motionDoc = ['sys'=>['mac'=>'020000000001'],
             'input:0'=>['id'=>0,'state'=>$up], 'input:1'=>['id'=>1,'state'=>$down]];
     }
 }
@@ -765,5 +766,45 @@ $m->feedback(false,false);$m->motionDoc['input:0']['state']=null;$m->Monitor();
 check(!$m->attrs['MotionFeedbackOK'],'Null is not standstill');
 $m->feedback(false,false);$m->Monitor();$m->attrs['LCNLastDispatch']='{}';
 check($m->ProcessLCNInput(35739,'034001') && end($GLOBALS['simActions'])===[44228,true],'C2 long unchanged: AUF');
+
+
+// End-to-end simulated path from EM172 feedback through existing watchdog
+// to the actual color/effect JSON on both WLED controllers.
+$GLOBALS['simVars'][44228]['value']=false;
+$m->attrs['MotionPendingUntil']=0;
+$m->feedback(false,false);$m->Monitor();
+mkVar(80004,VARIABLETYPE_INTEGER,(int)$m->values['Signal'],false);
+$motionAmpel=new WdTestAmpel();$motionAmpel->Create();$motionAmpel->initWd();
+$motionAmpel->props['SignalVariable']=80004;$motionAmpel->props['EnableAmpel']=true;
+$motionAmpel->ApplyChanges();$motionAmpel->Sync();
+function publishMotionSignal(MotionTestGate $gate, WdTestAmpel $ampel): void {
+    $GLOBALS['simVars'][80004]['value']=(int)$gate->values['Signal'];
+    $ampel->MessageSink(time(),80004,VM_UPDATE,[]);
+}
+function checkMotionScene(WdTestAmpel $ampel,array $color,bool $pulse,string $name): void {
+    foreach (['front','rear'] as $side) {
+        $state=$ampel->docs[$side]['state'];
+        $seg=$state['seg'][0]??[];
+        check($state['on']===true && ($seg['col'][0]??null)===$color &&
+            ($pulse ? ($seg['fx']??0)!==0 : ($seg['fx']??-1)===0),$name.' '.$side);
+    }
+}
+$m->feedback(true,false);$m->Monitor();publishMotionSignal($m,$motionAmpel);
+checkMotionScene($motionAmpel,[255,160,0,0],true,'EM172 AUF yellow pulse');
+$m->feedback(false,false);$GLOBALS['simVars'][13220]['value']=true;$m->Monitor();publishMotionSignal($m,$motionAmpel);
+checkMotionScene($motionAmpel,[0,255,0,0],false,'End AUF green');
+$GLOBALS['simVars'][13220]['value']=false;
+$m->feedback(false,true);$m->Monitor();publishMotionSignal($m,$motionAmpel);
+checkMotionScene($motionAmpel,[255,0,0,0],true,'EM172 ZU red pulse');
+$m->feedback(false,false);$GLOBALS['simVars'][21923]['value']=true;$m->Monitor();publishMotionSignal($m,$motionAmpel);
+checkMotionScene($motionAmpel,[255,0,0,0],false,'End ZU red');
+$GLOBALS['simVars'][21923]['value']=false;
+$m->feedback(true,false);$m->Monitor();publishMotionSignal($m,$motionAmpel);
+$m->motionDoc=null;$m->Monitor();publishMotionSignal($m,$motionAmpel);
+check(!$motionAmpel->docs['front']['state']['on']&&!$motionAmpel->docs['rear']['state']['on'],'Feedback loss disables both WLED controllers');
+$m->feedback(true,false);$m->Monitor();publishMotionSignal($m,$motionAmpel);
+checkMotionScene($motionAmpel,[255,160,0,0],true,'Feedback recovered');
+$m->feedback(false,false);$m->Monitor();publishMotionSignal($m,$motionAmpel);
+check(!$motionAmpel->docs['front']['state']['on']&&!$motionAmpel->docs['rear']['state']['on'],'Confirmed intermediate stop disables both WLED');
 
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

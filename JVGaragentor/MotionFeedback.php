@@ -56,6 +56,11 @@ trait JVMotionFeedbackTrait
     /** 0=standing, 1=opening, 3=closing, null=invalid/unavailable.
      *  Require actual booleans, not casts of null, strings or missing fields.
      */
+    protected function MotionExpectedMacHash(): string
+    {
+        return self::KNOWN_MOTION_MAC_HASH;
+    }
+
     private function MotionRead(): ?int
     {
         $doc = $this->MotionHttpStatus($this->MotionHost());
@@ -63,7 +68,7 @@ trait JVMotionFeedbackTrait
         if ($this->InstanceID === 15957 && $this->MotionHost() === '192.168.103.93') {
             $mac = $doc['sys']['mac'] ?? null;
             if (!is_string($mac) ||
-                hash('sha256', strtoupper(str_replace(':', '', $mac))) !== self::KNOWN_MOTION_MAC_HASH) return null;
+                hash('sha256', strtoupper(str_replace(':', '', $mac))) !== $this->MotionExpectedMacHash()) return null;
         }
         $up = $doc['input:0'] ?? null;
         $down = $doc['input:1'] ?? null;

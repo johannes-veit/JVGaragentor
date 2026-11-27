@@ -43,6 +43,7 @@ class JVGaragentor extends IPSModuleStrict
         $this->RegisterAttributeInteger('PulseVariable', 0);
         $this->RegisterAttributeBoolean('NeedsStop', false);
         $this->RegisterAttributeString('LastSnapshot', '');
+        $this->RegisterAttributeString('ShellyNames113', '[]');
         $this->RegisterTimer('Monitor', 1000, 'JVG_Monitor($_IPS["TARGET"]);');
         $this->RegisterTimer('RelayIDMigration', 0, ' $id = $_IPS["TARGET"]; if (!IPS_HasChanges($id) && JVG_RelayMigrationReady($id)) { if (IPS_SetProperty($id, "RelayOpenVariable", 23120) && IPS_SetProperty($id, "RelayCloseVariable", 11571) && IPS_SetProperty($id, "RelayStopVariable", 28550)) { IPS_ApplyChanges($id); } }');
         $this->SetVisualizationType(1);
@@ -59,6 +60,7 @@ class JVGaragentor extends IPSModuleStrict
         $this->SetTimerInterval('Monitor', 1000); // Local fallback / hold time / visualization only
         $this->LCNApplyChanges();
         $this->MotionApplyChanges();
+        $this->NameShellyVariables();
         $this->Monitor();
         $this->LCNScheduleCommission();
         $this->SetTimerInterval('RelayIDMigration', $this->RelayMigrationCandidate() ? 1000 : 0);
@@ -403,6 +405,42 @@ class JVGaragentor extends IPSModuleStrict
             if ($id !== $expected || IPS_GetParent($id) !== self::SHELLY_INSTANCE) return null;
         }
         return GetValueBoolean($id);
+    }
+
+    /** One-time display-name change only, for the two confirmed local devices.
+     * IDs, idents, values, actions, profiles and subscriptions are not modified.
+     * Later manual names are preserved. Missing/foreign variables are skipped.
+     */
+    private function NameShellyVariables(): void
+    {
+        if ($this->InstanceID !== 15957) return;
+        $targets = [
+            23120 => [self::SHELLY_INSTANCE, VARIABLETYPE_BOOLEAN, 'Relais AUF (O1)'],
+            11571 => [self::SHELLY_INSTANCE, VARIABLETYPE_BOOLEAN, 'Relais ZU (O2)'],
+            28550 => [self::SHELLY_INSTANCE, VARIABLETYPE_BOOLEAN, 'Relais STOPP (O3)'],
+            13220 => [self::SHELLY_INSTANCE, VARIABLETYPE_BOOLEAN, 'Endlage AUF (SW2)'],
+            21923 => [self::SHELLY_INSTANCE, VARIABLETYPE_BOOLEAN, 'Endlage ZU (SW1)'],
+            17585 => [self::SHELLY_INSTANCE, VARIABLETYPE_BOOLEAN, 'Erreichbar – Torsteuerung'],
+            11135 => [self::SHELLY_INSTANCE, VARIABLETYPE_STRING, 'WLAN-IP-Adresse'],
+            34580 => [self::SHELLY_INSTANCE, VARIABLETYPE_STRING, 'Ethernet-IP-Adresse'],
+            36019 => [self::MOTION_INSTANCE, VARIABLETYPE_BOOLEAN, 'Öffnungsfahrt (SW1)'],
+            41452 => [self::MOTION_INSTANCE, VARIABLETYPE_BOOLEAN, 'Schließfahrt (SW2)'],
+            53400 => [self::MOTION_INSTANCE, VARIABLETYPE_BOOLEAN, 'Erreichbar – Fahrtrichtung'],
+            41315 => [self::MOTION_INSTANCE, VARIABLETYPE_STRING, 'WLAN-IP-Adresse']
+        ];
+        $done = json_decode($this->ReadAttributeString('ShellyNames113'), true);
+        $done = is_array($done) ? array_map('intval', $done) : [];
+        foreach ($targets as $id => [$parent, $type, $name]) {
+            if (in_array($id, $done, true) || !IPS_InstanceExists($parent) ||
+                !$this->ValidVariable($id, $type) || IPS_GetParent($id) !== $parent) continue;
+            try {
+                if (IPS_GetName($id) !== $name && !IPS_SetName($id, $name)) continue;
+                $done[] = $id;
+            } catch (Throwable $e) {
+                $this->SendDebug('Shelly Namen', '#' . $id . ': ' . $e->getMessage(), 0);
+            }
+        }
+        $this->WriteAttributeString('ShellyNames113', json_encode($done) ?: '[]');
     }
 
     /** Repair only the explicitly confirmed garage and missing former output IDs.

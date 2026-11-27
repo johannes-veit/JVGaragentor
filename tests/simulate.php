@@ -19,6 +19,12 @@ function mkVar(int $id, int $type, mixed $value, bool $action = true): void {
     $GLOBALS['simVars'][$id] = ['type'=>$type,'value'=>$value,'action'=>$action];
 }
 function IPS_VariableExists(int $id): bool { return isset($GLOBALS['simVars'][$id]); }
+function IPS_GetName(int $id): string { return $GLOBALS['simVars'][$id]['name'] ?? 'Standardname'; }
+function IPS_SetName(int $id, string $name): bool {
+    if (!IPS_VariableExists($id)) return false;
+    $GLOBALS['simVars'][$id]['name']=$name;
+    return true;
+}
 function IPS_GetInstanceListByModuleID(string $guid): array {
     return $guid === '{8193BC5B-9A6A-48A3-A70C-B69A73472328}' ? $GLOBALS['simGateInstances'] : [];
 }
@@ -882,5 +888,32 @@ $GLOBALS['simVars'][23120]['value']=false;$GLOBALS['simVars'][36019]['value']=tr
 check($upgrade->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[28550,false],'New O3 used for actual motion STOP');
 $GLOBALS['simVars'][28550]['value']=true;$GLOBALS['simVars'][36019]['value']=false;$GLOBALS['simVars'][21923]['value']=false;$upgrade->Monitor();$upgrade->attrs['LCNLastDispatch']='{}';
 check($upgrade->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[11571,true],'New O2 used at standstill');
+
+
+// One-time cosmetic change: all 12 known variables, no actions or ID changes.
+resetHardware();
+$GLOBALS['simLCNModules']=[22849,14386,30888];
+$GLOBALS['simLCNParents']=[23120=>22849,11571=>22849,28550=>22849,13220=>22849,21923=>22849,17585=>22849,11135=>22849,34580=>22849,36019=>14386,41452=>14386,53400=>14386,41315=>14386,35739=>30888,30888=>37682,37682=>0];
+mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);mkVar(21923,VARIABLETYPE_BOOLEAN,true,false);
+mkVar(36019,VARIABLETYPE_BOOLEAN,false,false);mkVar(41452,VARIABLETYPE_BOOLEAN,false,false);mkVar(53400,VARIABLETYPE_BOOLEAN,true,false);
+mkVar(11135,VARIABLETYPE_STRING,'192.168.103.73',false);mkVar(34580,VARIABLETYPE_STRING,'',false);mkVar(41315,VARIABLETYPE_STRING,'192.168.103.93',false);
+mkVar(35739,VARIABLETYPE_STRING,'034002',false);
+$names=[23120=>'Relais AUF (O1)',11571=>'Relais ZU (O2)',28550=>'Relais STOPP (O3)',13220=>'Endlage AUF (SW2)',21923=>'Endlage ZU (SW1)',17585=>'Erreichbar – Torsteuerung',11135=>'WLAN-IP-Adresse',34580=>'Ethernet-IP-Adresse',36019=>'Öffnungsfahrt (SW1)',41452=>'Schließfahrt (SW2)',53400=>'Erreichbar – Fahrtrichtung',41315=>'WLAN-IP-Adresse'];
+$before=$GLOBALS['simVars'];
+$foreign=new JVGaragentor();$foreign->InstanceID=12345;$foreign->Create();$foreign->ApplyChanges();
+check($GLOBALS['simVars']===$before,'Other instance never renames Shelly variables');
+$rename=new JVGaragentor();$rename->InstanceID=15957;$rename->Create();
+$GLOBALS['simLCNParents'][41315]=999;
+$rename->ApplyChanges();
+check(IPS_GetName(41315)==='Standardname','Wrong parent skipped');
+$GLOBALS['simLCNParents'][41315]=14386;$rename->ApplyChanges();
+foreach($names as $id=>$name) check(IPS_GetName($id)===$name,'Expected display name #'.$id);
+$after=$GLOBALS['simVars'];
+foreach($after as &$entry) unset($entry['name']);unset($entry);
+check($before===$after,'Names do not modify any variable ID, value, type or action');
+check(count($GLOBALS['simActions'])===0,'Rename sends no relay commands');
+check(count(json_decode($rename->attrs['ShellyNames113'],true))===12,'All successful renames recorded');
+IPS_SetName(23120,'Mein manueller Name');$rename->ApplyChanges();
+check(IPS_GetName(23120)==='Mein manueller Name','Later manual name stays unchanged');
 
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

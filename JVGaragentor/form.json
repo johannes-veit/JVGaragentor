@@ -6,7 +6,7 @@
     },
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.2.12 – Fahrtrichtung über Symcon-Variablen des Shelly i4, ohne HTTP-Polling."
+      "caption": "JV Garagentor v1.2.13 – Fahrtrichtung über Symcon-Variablen; eindeutige Namen der beiden Shelly-Gerätevariablen."
     },
     {
       "type": "CheckBox",
@@ -16,7 +16,7 @@
     {
       "type": "SelectVariable",
       "name": "MotionOpenVariable",
-      "caption": "Öffnungsfahrt – SW1 Eingangsstatus (36019)",
+      "caption": "Öffnungsfahrt (SW1) – ID 36019",
       "validVariableTypes": [
         0
       ]
@@ -24,7 +24,7 @@
     {
       "type": "SelectVariable",
       "name": "MotionCloseVariable",
-      "caption": "Schließfahrt – SW2 Eingangsstatus (41452)",
+      "caption": "Schließfahrt (SW2) – ID 41452",
       "validVariableTypes": [
         0
       ]
@@ -32,7 +32,7 @@
     {
       "type": "SelectVariable",
       "name": "MotionOnlineVariable",
-      "caption": "Shelly i4 Erreichbar (53400)",
+      "caption": "Erreichbar – Fahrtrichtung (53400)",
       "validVariableTypes": [
         0
       ]
@@ -50,27 +50,27 @@
     {
       "type": "SelectVariable",
       "name": "RelayOpenVariable",
-      "caption": "Shelly AUF – O1, Status, ID 23120"
+      "caption": "Relais AUF (O1) – ID 23120"
     },
     {
       "type": "SelectVariable",
       "name": "RelayCloseVariable",
-      "caption": "Shelly ZU – O2, Status 1, ID 11571"
+      "caption": "Relais ZU (O2) – ID 11571"
     },
     {
       "type": "SelectVariable",
       "name": "RelayStopVariable",
-      "caption": "Shelly STOP – O3, Status 2, ID 28550"
+      "caption": "Relais STOPP (O3) – ID 28550 (EIN = Ruhe, AUS = STOPP)"
     },
     {
       "type": "SelectVariable",
       "name": "OnlineVariable",
-      "caption": "Shelly Erreichbar – ID 17585"
+      "caption": "Erreichbar – Torsteuerung (17585)"
     },
     {
       "type": "SelectVariable",
       "name": "EndOpenVariable",
-      "caption": "Endlage AUF – SW2, Eingangsstatus 1, ID 13220 (TRUE = AUF)",
+      "caption": "Endlage AUF (SW2) – ID 13220 (TRUE = AUF)",
       "validVariableTypes": [
         0
       ]
@@ -78,14 +78,14 @@
     {
       "type": "SelectVariable",
       "name": "EndCloseVariable",
-      "caption": "Endlage ZU – SW1, Eingangsstatus, ID 21923 (TRUE = ZU)",
+      "caption": "Endlage ZU (SW1) – ID 21923 (TRUE = ZU)",
       "validVariableTypes": [
         0
       ]
     },
     {
       "type": "Label",
-      "caption": "Bestehende Garage #15957: bekannte falsch gespeicherte Status-/Endlagen-IDs werden nur bei bestätigtem Shelly #22849 korrigiert. Eingangsstatus AUF 13220 / ZU 21923; Status 23120/11571/28550 sind nur Relais."
+      "caption": "Garage #15957: Relais 23120/11571/28550, Endlagen 13220/21923; einmalige Namenskorrektur der beiden bestätigten Shelly-Instanzen. IDs und Funktionen bleiben unverändert."
     },
     {
       "type": "CheckBox",

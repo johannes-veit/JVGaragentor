@@ -1,3 +1,7 @@
+## v1.2.13 – eindeutige Shelly-Variablennamen
+
+Einmalige kosmetische Umbenennung der 12 bestätigten Variablen von Shelly #22849 und #14386 durch Torinstanz #15957. IDs, Ident, Werte, Aktionen und Zuordnungen bleiben unverändert; abweichende Elternobjekte werden übersprungen, nachträglich manuell gesetzte Namen bleiben erhalten. Keine Änderung an der HTML-Kachel oder WLED-Logik.
+
 ## v1.2.12 – neu erzeugte Pro-3-Relaisvariablen
 
 Shelly #22849: O1 AUF #23120, O2 ZU #11571, O3 STOP #28550. Alte gelöschte IDs 44228/56652/55944 werden ausschließlich bei Torinstanz #15957 und validierter Zuordnung in bestätigter Endlage/Stillstand automatisch in den Eigenschaften ersetzt. Keine Fahrbefehle beim Update. Endlagen #13220/#21923 unverändert; Namen sind unerheblich. Die Zuordnungen bleiben editierbar.

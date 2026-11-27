@@ -114,6 +114,10 @@ class JVGaragentor extends IPSModuleStrict
         $endOpen = $this->EndSignal('EndOpenVariable');
         $endClose = $this->EndSignal('EndCloseVariable');
         if ($command !== 'STOP') {
+            if ($feedback && !GetValueBoolean($ids['STOP'])) {
+                $this->SetWarning('STOP-Kontakt noch offen – Fahrbefehl gesperrt.');
+                return false;
+            }
             if ($this->ReadAttributeBoolean('NeedsStop')) {
                 $this->SetWarning('Nach Laufzeitüberschreitung zuerst STOP drücken.');
                 return false;
@@ -436,7 +440,7 @@ class JVGaragentor extends IPSModuleStrict
         $deadline = 0;
         if (in_array($signal, [1, 3], true)) {
             $started = $this->ReadAttributeInteger('MovementStarted');
-            $deadline = $this->MotionHost() !== '' ? 0 : ($started > 0 ? $started + $this->MovementTimeout() : 0);
+            $deadline = $this->MotionHost() !== '' ? time() + 4 : ($started > 0 ? $started + $this->MovementTimeout() : 0);
         } elseif (in_array($signal, [2, 4], true)) {
             $deadline = $this->ReadAttributeInteger('SignalUntil');
         }

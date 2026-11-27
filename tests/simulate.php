@@ -719,6 +719,9 @@ check($m->values['Position']==='ZU' && $m->values['Signal']===0 && count($GLOBAL
 $m->feedback(true,false);$m->Monitor();
 check($m->values['Position']==='LÄUFT AUF' && $m->values['Signal']===1,'External AUF even while departing end contact remains on');
 check(count($GLOBALS['simActions'])===0,'External motion detected without relay command');
+$motionSnapshot=json_decode(end($m->sent),true);
+check($motionSnapshot['effectUntil']>=time()+3 && $motionSnapshot['effectUntil']<=time()+4,
+    'Kachel gets a renewable short deadline for real motion, not zero');
 $GLOBALS['simVars'][21923]['value']=false;
 check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'C2 short during external opening sends STOP');
 check($m->values['Signal']===1,'STOP command not mistaken for actual standstill');
@@ -741,6 +744,8 @@ $m->feedback(true,false);$m->Monitor();
 check($m->values['Signal']===1,'External reversal from closing to opening');
 $m->attrs['MovementStarted']=time()-130;$m->Monitor();
 check($m->values['Signal']===1 && $m->attrs['NeedsStop'],'Timeout does not fake stop while motion proven');
+$motionSnapshot=json_decode(end($m->sent),true);
+check($motionSnapshot['effectUntil']>=time()+3,'Kachel remains lit even after movement timeout if feedback still valid');
 $m->feedback(false,false);$GLOBALS['simVars'][13220]['value']=true;$m->Monitor();
 check($m->values['Position']==='AUF' && $m->values['Signal']===2,'End AUF green after external drive');
 $m->attrs['SignalUntil']=time()-1;$m->Monitor();
@@ -765,6 +770,10 @@ check(!$m->attrs['MotionFeedbackOK'],'Wrong device at configured IP rejected');
 $m->feedback(false,false);$m->motionDoc['input:0']['state']=null;$m->Monitor();
 check(!$m->attrs['MotionFeedbackOK'],'Null is not standstill');
 $m->feedback(false,false);$m->Monitor();$m->attrs['LCNLastDispatch']='{}';
+$GLOBALS['simVars'][55944]['value']=false;
+$before=count($GLOBALS['simActions']);
+check(!$m->Command('AUF') && count($GLOBALS['simActions'])===$before,'No drive while STOP contact open');
+$GLOBALS['simVars'][55944]['value']=true;
 check($m->ProcessLCNInput(35739,'034001') && end($GLOBALS['simActions'])===[44228,true],'C2 long unchanged: AUF');
 
 

@@ -74,4 +74,14 @@ check(html.includes('.jvg-control .jvg-icon {position:absolute;display:block;lef
 check(!html.includes('cqh')&&!html.includes('aspect-ratio:1')&&!html.includes('jvg-circle'),'Keine problematische intrinsische Iconhöhe / Container-Höheneinheit');
 check((html.match(/class="jvg-icon-bg" cx="50" cy="50" r="50"/g)||[]).length===3,'Kreise komplett innerhalb der SVG-ViewBox');
 check(html.includes('.jvg-stop .jvg-icon {left:30.65%;top:22%;width:38.7%;height:68%}'),'STOP behält kompakte Größe');
+push(1,'LÄUFT AUF',4);
+check(classes.has('jvg-yellow-flash'),'Actual direction: short renewable deadline lights tile');
+fakeTime+=3000;
+push(1,'LÄUFT AUF',4);
+fakeTime+=2000;tick();
+check(classes.has('jvg-yellow-flash'),'Fresh server heartbeat extends active signal');
+fakeTime+=2500;tick();
+check(classes.size===0,'Lost heartbeat removes stale motion color');
+push(3,'LÄUFT ZU',4);
+check(classes.has('jvg-red-flash'),'Actual closing uses renewable deadline as well');
 console.log('PASS '+checks+' HTML/JS-Visualisierungstests');

@@ -6,7 +6,7 @@
     },
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.2.9 – tatsächliche Fahrtrichtung aus EM 172 / Shelly i4; automatische Vorbelegung für bestehende Instanz #15957."
+      "caption": "JV Garagentor v1.2.10 – tatsächliche Fahrtrichtung aus EM 172 / Shelly i4; automatische Vorbelegung für bestehende Instanz #15957."
     },
     {
       "type": "ValidationTextBox",

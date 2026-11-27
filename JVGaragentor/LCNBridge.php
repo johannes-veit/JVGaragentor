@@ -122,13 +122,13 @@ trait JVLCNBridgeTrait
              strtoupper($this->ReadPropertyString('LCNSchiebeTable')) === 'C' &&
              $this->ReadPropertyInteger('LCNSchiebeKey') === 2) ||
             $this->ReadPropertyInteger('OnlineVariable') !== 17585 ||
-            $this->RelayIds() !== ['AUF'=>44228,'STOP'=>55944,'ZU'=>56652] ||
+            $this->RelayIds() !== ['AUF'=>23120,'STOP'=>28550,'ZU'=>11571] ||
             $this->EndVariableId('EndOpenVariable') !== self::END_OPEN_ID ||
             $this->EndVariableId('EndCloseVariable') !== self::END_CLOSE_ID) return false;
-        foreach ([44228,56652,55944,17585,self::END_OPEN_ID,self::END_CLOSE_ID] as $id) {
+        foreach ([23120,11571,28550,17585,self::END_OPEN_ID,self::END_CLOSE_ID] as $id) {
             if (!$this->ValidVariable($id, VARIABLETYPE_BOOLEAN) || IPS_GetParent($id) !== self::SHELLY_INSTANCE) return false;
         }
-        foreach ([44228,56652,55944] as $id) if (!$this->HasAction($id)) return false;
+        foreach ([23120,11571,28550] as $id) if (!$this->HasAction($id)) return false;
         return true;
     }
 
@@ -138,7 +138,7 @@ trait JVLCNBridgeTrait
         if ($this->ReadAttributeBoolean('LCNCommissionDone127') || !$this->LCNCommissionMappingOK() ||
             !$this->ReadPropertyBoolean('EnableControl') || !$this->IsOnline() ||
             $this->ReadAttributeBoolean('NeedsStop') || $this->ReadAttributeInteger('MovementStarted') > 0 ||
-            GetValueBoolean(44228) || GetValueBoolean(56652) || !GetValueBoolean(55944) ||
+            GetValueBoolean(23120) || GetValueBoolean(11571) || !GetValueBoolean(28550) ||
             $this->ResolvedEnd() === null) return false;
         return true;
     }
@@ -311,6 +311,9 @@ trait JVLCNBridgeTrait
         $form['elements'][] = ['type'=>'Label', 'caption'=>'Fahrtrichtung: ' .
             ($this->MotionEnabled() ? ($this->MotionMappingValid() ? 'Symcon-Zuordnung gültig' : 'Zuordnung ungültig') : 'deaktiviert (Altmodus)') .
             '. AUF #' . $this->MotionIds()[0] . ' / ZU #' . $this->MotionIds()[1] . ' / Online #' . $this->MotionIds()[2]];
+        if ($this->RelayMigrationCandidate()) {
+            $form['elements'][] = ['type'=>'Label','caption'=>'Alte Relais-IDs werden bei bestätigtem Stillstand und Endlage automatisch auf 23120 / 11571 / 28550 korrigiert.'];
+        }
         foreach (['Garage' => 'Garagentor', 'Schiebe' => 'Schiebetor'] as $channel => $title) {
             $table = $this->ReadPropertyString('LCN' . $channel . 'Table');
             $key = $this->ReadPropertyInteger('LCN' . $channel . 'Key');

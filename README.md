@@ -1,3 +1,7 @@
+## v1.2.12 – neu erzeugte Pro-3-Relaisvariablen
+
+Shelly #22849: O1 AUF #23120, O2 ZU #11571, O3 STOP #28550. Alte gelöschte IDs 44228/56652/55944 werden ausschließlich bei Torinstanz #15957 und validierter Zuordnung in bestätigter Endlage/Stillstand automatisch in den Eigenschaften ersetzt. Keine Fahrbefehle beim Update. Endlagen #13220/#21923 unverändert; Namen sind unerheblich. Die Zuordnungen bleiben editierbar.
+
 ## v1.2.11 – native Symcon-Fahrtrückmeldung
 
 ShellyDevice #14386: AUF #36019, ZU #41452, Erreichbar #53400. Alle drei IDs und die Fahrtrichtungs-/LCN-STOPP-Option sind im Konfigurationsformular editierbar, bei Torinstanz #15957 automatisch vorbelegt. VM_UPDATE für beide Richtungen, beide Endlagen und beide Online-Zustände; 1-s-Timer liest nur lokale Symcon-Variablen. Keine HTTP-Abfrage des i4 und keine zusätzliche MQTT-Verbindung. Bestehende Instanzen, LCN, Kachel, WLED-Presets und Nachleuchtzeiten unverändert. Die Symcon-Rückmeldung ersetzt keine Sicherheitseinrichtung und hängt von der Aktualität des ShellyDevice-Moduls ab. Die HTTP-Lösung der vorherigen Version ist ersetzt.
@@ -60,9 +64,9 @@ Shelly Pro 3 Garagentor: Instanz **22849**, IP `192.168.103.73`.
 
 | Befehl | Shelly | Symcon-Variable | Impuls |
 |---|---|---:|---|
-| AUF | O1, `Status` | **44228** | EIN, Auto-OFF nach 1 s |
-| ZU | O2, `Status 1` | **56652** | EIN, Auto-OFF nach 1 s |
-| STOP | O3, `Status 2` | **55944** | AUS, Auto-ON nach 1 s |
+| AUF | O1, `Status` | **23120** | EIN, Auto-OFF nach 1 s |
+| ZU | O2, `Status 1` | **11571** | EIN, Auto-OFF nach 1 s |
+| STOP | O3, `Status 2` | **28550** | AUS, Auto-ON nach 1 s |
 | Erreichbar | – | **17585** | Boolean |
 
 **Bestätigt am 25.11.2026:** Shelly-Instanz 22849, Endlage AUF: SW2 / `Eingangsstatus 1` **13220**, Endlage ZU: SW1 / `Eingangsstatus` **21923**. Beide sind Boolean (TRUE bei erreichter Endlage). Ab v1.2.2 sind diese IDs vorbelegt. Bei bestehenden Instanzen mit gespeicherten Nullwerten wird das bestätigte Paar nur bei passender Relais-/Online-Zuordnung und überprüfter Elterninstanz automatisch verwendet. Explizite abweichende Zuordnungen werden nicht überschrieben; ungültige, doppelte, vertauschte bekannte IDs oder Relais-/Online-IDs werden nicht als Endlage ausgewertet. Fahrbefehle ohne gültige Rückmeldungen bleiben bei aktivierter Endlagensperre gesperrt.
@@ -106,7 +110,7 @@ GitHub Actions prüft zusätzlich JSON und die JavaScript-Syntax. Reale Endlagen
 
 ## Automatische Konfiguration (v1.1.1)
 
-- Vorbelegt: Shelly O1 AUF **44228**, O2 ZU **56652**, O3 STOP **55944**, Online **17585**.
+- Vorbelegt: Shelly O1 AUF **23120**, O2 ZU **11571**, O3 STOP **28550**, Online **17585**.
 - Vorbelegt: WLED Garage vorne Presets **46199**, Ein/Aus **29605**, hinten Presets **17676**, Ein/Aus **16055** (ab v1.2.3, Freigabe nach Preset-Prüfung).
 - Die **Ampel-Signal-Variable** wird automatisch aus der **einzigen** JVGaragentor-Instanz ermittelt. Ihre Objekt-ID ist erst nach Erstellung dieser Instanz bekannt. Die Verbindung wird auch dann gefunden, wenn die Torinstanz später angelegt wird (10-Sekunden-Timer).
 - Bei mehreren Torinstanzen oder einer bewusst gesetzten, aber ungültigen manuellen Variable erfolgt **keine** automatische Wahl irgendeiner Quelle.

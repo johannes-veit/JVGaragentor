@@ -117,7 +117,7 @@ $cnt=0;
 function check(bool $ok,string $what): void {global $cnt;$cnt++;if(!$ok)throw new RuntimeException("FAIL $cnt: $what");}
 function resetHardware(): void {
     $GLOBALS['simVars']=[];$GLOBALS['simActions']=[];
-    mkVar(44228,0,false);mkVar(56652,0,false);mkVar(55944,0,true);mkVar(17585,0,true);
+    mkVar(23120,0,false);mkVar(11571,0,false);mkVar(28550,0,true);mkVar(17585,0,true);
     mkVar(80001,0,false,false);mkVar(80002,0,true,false); // Start in Endlage ZU
     mkVar(46199,1,4);mkVar(29605,0,true);
     mkVar(17676,1,3);mkVar(16055,0,true);
@@ -139,12 +139,12 @@ check($gate->Command('AUF'),'AUF senden');
 check($gate->values['Position']==='LÄUFT AUF','Fahrzustand gesetzt');
 check($gate->values['Signal']===1,'Gelbes Blinksignal bei AUF-Fahrt');
 check($gate->attrs['SignalUntil']===0,'Bei Fahrt kein Nachleuchten aktiv');
-check($GLOBALS['simActions'][0]===[44228,true],'Richtiges Relais O1');
+check($GLOBALS['simActions'][0]===[23120,true],'Richtiges Relais O1');
 check($gate->Command('AUF'),'doppelter AUF als Noop');
 check(count($GLOBALS['simActions'])===1,'Keine doppelten Impulse');
 check(!$gate->Command('ZU'),'Richtungswechsel ohne STOP gesperrt');
 check(count($GLOBALS['simActions'])===1,'Sperre sendet nichts');
-$GLOBALS['simVars'][44228]['value']=false; // Shelly Auto-OFF
+$GLOBALS['simVars'][23120]['value']=false; // Shelly Auto-OFF
 $GLOBALS['simVars'][80002]['value']=false;
 $GLOBALS['simVars'][80001]['value']=true;
 $gate->Monitor();
@@ -153,16 +153,16 @@ check($gate->values['Signal']===2,'Obere Endlage -> Grün');
 check($gate->attrs['SignalUntil']>=time()+9,'Grün leuchtet 10 Sekunden');
 check($gate->Command('ZU'),'ZU senden');
 check($gate->values['Signal']===3,'Rotes Blinksignal bei ZU-Fahrt');
-check(end($GLOBALS['simActions'])===[56652,true],'O2 Impuls');
-$GLOBALS['simVars'][56652]['value']=false;
+check(end($GLOBALS['simActions'])===[11571,true],'O2 Impuls');
+$GLOBALS['simVars'][11571]['value']=false;
 check($gate->Command('STOP'),'STOP senden');
-check(end($GLOBALS['simActions'])===[55944,false],'O3 Ausschalten als Stop');
+check(end($GLOBALS['simActions'])===[28550,false],'O3 Ausschalten als Stop');
 check($gate->values['Position']==='AUF','STOP bei immer noch meldender Endlage bleibt AUF');
 check($gate->values['Signal']===0,'STOP schaltet Anzeige sofort AUS, auch an Endlage');
-$GLOBALS['simVars'][55944]['value']=true; // Shelly Auto-ON
+$GLOBALS['simVars'][28550]['value']=true; // Shelly Auto-ON
 $GLOBALS['simVars'][80001]['value']=false;
 check($gate->Command('ZU'),'erneutes ZU nach Stop möglich');
-$GLOBALS['simVars'][56652]['value']=false;
+$GLOBALS['simVars'][11571]['value']=false;
 $gate->attrs['MovementStarted']=time()-200;
 $gate->Monitor();
 check($gate->values['Position']==='GESTOPPT','Laufzeitüberschreitung ohne Endlage');
@@ -170,7 +170,7 @@ check($gate->values['Signal']===0,'Timeout schaltet Ampelsignal AUS');
 check($gate->values['Hinweis']!== '', 'Zeitüberschreitung dokumentiert');
 check(!$gate->Command('AUF'),'Nach Timeout muss explizit STOP erfolgen');
 check($gate->Command('STOP'),'STOP aus Zwischenposition');
-$GLOBALS['simVars'][55944]['value']=true;
+$GLOBALS['simVars'][28550]['value']=true;
 check($gate->values['Position']==='GESTOPPT','Zwischenposition bleibt GESTOPPT');
 $GLOBALS['simVars'][80001]['value']=true;
 $GLOBALS['simVars'][80002]['value']=true;
@@ -189,9 +189,9 @@ $GLOBALS['simVars'][17585]['value']=true;
 $gate->props['EndOpenVariable']=0;
 check(!$gate->Command('AUF'),'Sensorzuordnung fehlt - Sperre');
 $gate->props['EndOpenVariable']=80001;
-$gate->props['RelayOpenVariable']=56652;
+$gate->props['RelayOpenVariable']=11571;
 check(!$gate->Command('AUF'),'gleiches Relais doppelt zugeordnet');
-$gate->props['RelayOpenVariable']=44228;
+$gate->props['RelayOpenVariable']=23120;
 $gate->props['EnableControl']=false;
 check(!$gate->Command('ZU'),'Reset Testmodus verhindert Befehl');
 $html=$gate->GetVisualizationTile();
@@ -236,16 +236,16 @@ check($gate->values['Signal']===0 && $gate->values['Position']==='ZU','Rote Nach
 $gate->props['MovementTimeoutSeconds']=999;
 $GLOBALS['simVars'][80002]['value']=false;
 check($gate->Command('AUF'),'Fahrt bei maximalem Timeout 120 s');
-$GLOBALS['simVars'][44228]['value']=false;
+$GLOBALS['simVars'][23120]['value']=false;
 $gate->attrs['MovementStarted']=time()-121;
 $gate->Monitor();
 check($gate->values['Position']==='GESTOPPT' && $gate->values['Signal']===0, 'Auch bei 999-s-Einstellung nach 120 s Timeout');
 check(!$gate->Command('ZU'), 'Timeout sperrt Weiterfahrt');
 check($gate->Command('STOP'), 'STOP bei Timeout dennoch möglich');
-$GLOBALS['simVars'][55944]['value']=true;
+$GLOBALS['simVars'][28550]['value']=true;
 $gate->props['MovementTimeoutSeconds']=8;
 check($gate->Command('ZU'),'Kürzerer Timeout kann eingestellt werden');
-$GLOBALS['simVars'][56652]['value']=false;
+$GLOBALS['simVars'][11571]['value']=false;
 $gate->attrs['MovementStarted']=time()-9;
 $gate->Monitor();
 check($gate->values['Position']==='GESTOPPT' && $gate->values['Signal']===0, '8-s-Timeout wirkt vor der globalen 120-s-Grenze');
@@ -415,8 +415,8 @@ $lcnGate->props['LCNGarageEnabled']=true;
 check(!$lcnGate->ProcessLCNInput(80101,'034001'),'LCN-Freigabe ersetzt Torfreigabe nicht');
 $lcnGate->props['EnableControl']=true;
 check($lcnGate->ProcessLCNInput(80101,'034001'),'C2 LANG öffnet Garagentor via Command');
-check(end($GLOBALS['simActions']) === [44228,true],'LCN Garagentor verwendet O1 AUF');
-$GLOBALS['simVars'][44228]['value']=false;
+check(end($GLOBALS['simActions']) === [23120,true],'LCN Garagentor verwendet O1 AUF');
+$GLOBALS['simVars'][23120]['value']=false;
 check(!$lcnGate->ProcessLCNInput(80101,'034001'),'Doppelt empfangenes LCN LANG ignoriert');
 check(count($GLOBALS['simActions']) === $actionCount+1,'Keine doppelte Shelly-Auslösung');
 check(!$lcnGate->ProcessLCNInput(80101,'033002'),'C1 bei abgeschaltetem Schiebetorkanal ohne Aktion');
@@ -508,7 +508,7 @@ check(!isset($realLCN->messages[35739]),
     'Automatische Quellwahl fällt bei abweichender Elterninstanz sicher weg');
 // Reales Shelly-Setup: beide bestätigten Eingänge statt Ausgangsstatus.
 resetHardware();
-$GLOBALS['simLCNParents'] = [44228=>22849,56652=>22849,55944=>22849,17585=>22849,13220=>22849,21923=>22849];
+$GLOBALS['simLCNParents'] = [23120=>22849,11571=>22849,28550=>22849,17585=>22849,13220=>22849,21923=>22849];
 mkVar(13220, VARIABLETYPE_BOOLEAN, false, false);
 mkVar(21923, VARIABLETYPE_BOOLEAN, true, false);
 $realGate = new JVGaragentor();
@@ -522,10 +522,10 @@ $realGate->props['EndOpenVariable'] = 0;
 $realGate->props['EndCloseVariable'] = 0;
 $realGate->ApplyChanges();
 check($realGate->values['Position'] === 'ZU','Alte Nullwerte: bestätigte Eingänge automatisch erkannt');
-$GLOBALS['simVars'][44228]['value'] = true;
+$GLOBALS['simVars'][23120]['value'] = true;
 $realGate->Monitor();
 check($realGate->values['Position'] === 'ZU','Ausgang AUF wird nicht als Endlage ausgewertet');
-$GLOBALS['simVars'][44228]['value'] = false;
+$GLOBALS['simVars'][23120]['value'] = false;
 $GLOBALS['simVars'][21923]['value'] = false;
 $realGate->Monitor();
 check($realGate->values['Position'] === 'GESTOPPT','Zwischenposition ohne Fahrbefehl nicht als Endlage ausgegeben');
@@ -542,7 +542,7 @@ $GLOBALS['simVars'][21923]['value'] = true;
 $realGate->Monitor();
 check($realGate->values['Position'] === 'ZU' && $realGate->values['Signal'] === 4,
     'Realer SW1 ergibt ZU und Rot');
-$realGate->props['EndOpenVariable'] = 44228;
+$realGate->props['EndOpenVariable'] = 23120;
 $realGate->props['EnableControl'] = true;
 $realGate->Monitor();
 check($realGate->values['Position'] === 'GESTOPPT' && $realGate->values['Signal'] === 0,
@@ -632,7 +632,7 @@ $wd->Sync();
 // One-time commissioning of existing garage only, no movement during update.
 resetHardware();
 $GLOBALS['simLCNModules']=[30888];
-$GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,44228=>22849,56652=>22849,55944=>22849,17585=>22849,13220=>22849,21923=>22849];
+$GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,23120=>22849,11571=>22849,28550=>22849,17585=>22849,13220=>22849,21923=>22849];
 mkVar(35739,VARIABLETYPE_STRING,'034001',false);
 mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);mkVar(21923,VARIABLETYPE_BOOLEAN,true,false);
 $commission=new JVGaragentor();$commission->InstanceID=15957;$commission->Create();$commission->props['MotionFeedbackEnabled']=false;
@@ -641,9 +641,9 @@ $commission->props['RequireEndStops']=false;$commission->props['LCNSchiebeEnable
 $commission->ApplyChanges();
 check($commission->LCNCommissionReady(),'Bekannte bestehende Garage in Endlage darf C2 einmalig freigeben');
 check(count($GLOBALS['simActions'])===0,'Update sendet keinen Torbefehl und spielt altes LCN-Telegramm nicht erneut ab');
-$GLOBALS['simVars'][55944]['value']=false;
+$GLOBALS['simVars'][28550]['value']=false;
 check(!$commission->LCNCommissionReady(),'Keine Freigabe bei STOP-Relais AUS');
-$GLOBALS['simVars'][55944]['value']=true;
+$GLOBALS['simVars'][28550]['value']=true;
 $GLOBALS['simVars'][17585]['value']=false;
 check(!$commission->LCNCommissionReady(),'Keine Freigabe bei Shelly offline');
 $GLOBALS['simVars'][17585]['value']=true;
@@ -662,18 +662,18 @@ $commission->props['RequireEndStops']=true;$commission->props['LCNGarageEnabled'
 $commission->ApplyChanges();
 check($commission->attrs['LCNCommissionDone127'],'Einmalige Migration nach Übernahme abgeschlossen');
 check($commission->props['LCNSchiebeEnabled']===true,'Bestehende Schiebetorfreigabe unverändert');
-check($commission->ProcessLCNInput(35739,'034001')&&end($GLOBALS['simActions'])===[44228,true],'C2 LANG nutzt unverändert reguläre AUF-Steuerung');
+check($commission->ProcessLCNInput(35739,'034001')&&end($GLOBALS['simActions'])===[23120,true],'C2 LANG nutzt unverändert reguläre AUF-Steuerung');
 $commission->props['LCNGarageEnabled']=false;$commission->ApplyChanges();
 check(!$commission->LCNCommissionReady(),'Nach manueller Deaktivierung keine erneute automatische Freigabe');
 // Regression: actual C2 telegram must be used, not a subsequent LOS in the variable.
 // Also correct stored output IDs as end stops on the specifically verified garage.
 resetHardware();
 $GLOBALS['simLCNModules']=[30888];
-$GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,44228=>22849,56652=>22849,55944=>22849,17585=>22849,13220=>22849,21923=>22849];
+$GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,23120=>22849,11571=>22849,28550=>22849,17585=>22849,13220=>22849,21923=>22849];
 mkVar(35739,VARIABLETYPE_STRING,'034000',false);
 mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);mkVar(21923,VARIABLETYPE_BOOLEAN,true,false);
 $repair=new JVGaragentor();$repair->InstanceID=15957;$repair->Create();$repair->props['MotionFeedbackEnabled']=false;
-$repair->props['EnableControl']=true;$repair->props['EndOpenVariable']=44228;$repair->props['EndCloseVariable']=56652;
+$repair->props['EnableControl']=true;$repair->props['EndOpenVariable']=23120;$repair->props['EndCloseVariable']=11571;
 $repair->ApplyChanges();
 check($repair->values['Position']==='ZU','Bekannte Status-Verwechslung korrigiert: Endlage aus Eingangsstatus');
 check($repair->LCNCommissionReady(),'Alte Status-IDs verhindern C2-Migration nicht mehr');
@@ -682,13 +682,13 @@ $repair->props['LCNGarageEnabled']=true;$repair->props['EndOpenVariable']=13220;
 $repair->messages=[];$repair->ApplyChanges();
 check(($repair->messages[35739]??0)===VM_UPDATE,'Verlorene Host-Registrierung beim Update erneut aufgebaut');
 $repair->MessageSink(time(),35739,VM_UPDATE,['034001',true,'034000']);
-check(end($GLOBALS['simActions'])===[44228,true],'C2 LANG wird aus Ereigniswert verarbeitet obwohl String schon LOS enthält');
+check(end($GLOBALS['simActions'])===[23120,true],'C2 LANG wird aus Ereigniswert verarbeitet obwohl String schon LOS enthält');
 $before=count($GLOBALS['simActions']);
 $repair->MessageSink(time(),35739,VM_UPDATE,['034000',true,'034001']);
 check(count($GLOBALS['simActions'])===$before,'C2 LOS löst weiterhin nichts aus');
 $repair->MessageSink(time(),35739,VM_UPDATE,[]);
 check(count($GLOBALS['simActions'])===$before,'Fehlende Ereignisdaten spielen keinen gespeicherten Befehl ab');
-$other=new JVGaragentor();$other->Create();$other->props['EndOpenVariable']=44228;$other->props['EndCloseVariable']=56652;$other->props['EnableControl']=true;$other->ApplyChanges();
+$other=new JVGaragentor();$other->Create();$other->props['EndOpenVariable']=23120;$other->props['EndCloseVariable']=11571;$other->props['EnableControl']=true;$other->ApplyChanges();
 check(!$other->Command('AUF'),'Fremde Instanz mit Status statt Eingangsstatus bleibt gesperrt');
 
 // EM 172: exercise actual Symcon variables and VM_UPDATE messages.
@@ -704,7 +704,7 @@ class MotionTestGate extends JVGaragentor {
 }
 resetHardware();
 $GLOBALS['simLCNModules']=[30888];
-$GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,44228=>22849,56652=>22849,55944=>22849,17585=>22849,13220=>22849,21923=>22849];
+$GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,23120=>22849,11571=>22849,28550=>22849,17585=>22849,13220=>22849,21923=>22849];
 mkVar(35739,VARIABLETYPE_STRING,'034002',false);
 mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);
 mkVar(21923,VARIABLETYPE_BOOLEAN,true,false);
@@ -731,23 +731,23 @@ $motionSnapshot=json_decode(end($m->sent),true);
 check($motionSnapshot['effectUntil']>=time()+3 && $motionSnapshot['effectUntil']<=time()+4,
     'Kachel gets a renewable short deadline for real motion, not zero');
 $GLOBALS['simVars'][21923]['value']=false;
-check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'C2 short during external opening sends STOP');
+check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[28550,false],'C2 short during external opening sends STOP');
 check($m->values['Signal']===1,'STOP command not mistaken for actual standstill');
-$GLOBALS['simVars'][55944]['value']=true;
+$GLOBALS['simVars'][28550]['value']=true;
 $m->feedback(false,false);$m->event(36019);
 check($m->values['Position']==='GESTOPPT' && $m->values['Signal']===0,'Actual intermediate stop');
 $m->attrs['LCNLastDispatch']='{}';
-check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[56652,true],'C2 short at standstill sends close');
+check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[11571,true],'C2 short at standstill sends close');
 check($m->values['Signal']===0,'No optimistic movement after accepted command');
-$GLOBALS['simVars'][56652]['value']=false;
+$GLOBALS['simVars'][11571]['value']=false;
 $m->attrs['LCNLastDispatch']='{}';
-check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'Short while command pending sends STOP');
-$GLOBALS['simVars'][55944]['value']=true;
+check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[28550,false],'Short while command pending sends STOP');
+$GLOBALS['simVars'][28550]['value']=true;
 $m->feedback(false,true);$m->event(41452);
 check($m->values['Position']==='LÄUFT ZU' && $m->values['Signal']===3,'External ZU signal');
 $m->attrs['LCNLastDispatch']='{}';
-check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'C2 short during external closing sends STOP');
-$GLOBALS['simVars'][55944]['value']=true;
+check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[28550,false],'C2 short during external closing sends STOP');
+$GLOBALS['simVars'][28550]['value']=true;
 $m->feedback(true,false);$m->event(36019);
 check($m->values['Signal']===1,'External reversal from closing to opening');
 $m->attrs['MovementStarted']=time()-130;$m->Monitor();
@@ -767,8 +767,8 @@ check(!$m->attrs['MotionFeedbackOK'] && $m->values['Signal']===0,'Conflicting fe
 $before=count($GLOBALS['simActions']);
 check(!$m->Command('ZU') && count($GLOBALS['simActions'])===$before,'Invalid feedback blocks movement');
 $m->attrs['LCNLastDispatch']='{}';
-check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'Short with invalid feedback only sends STOP');
-$GLOBALS['simVars'][55944]['value']=true;
+check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[28550,false],'Short with invalid feedback only sends STOP');
+$GLOBALS['simVars'][28550]['value']=true;
 $GLOBALS['simVars'][53400]['value']=false;$m->event(53400);
 check(!$m->attrs['MotionFeedbackOK'] && $m->values['Signal']===0,'Lost i4 cannot display stale movement or green');
 $m->feedback(false,true);$m->event(41452);
@@ -787,16 +787,16 @@ check(!$m->attrs['MotionFeedbackOK'],'Missing variable is not standstill');
 mkVar(36019,VARIABLETYPE_BOOLEAN,false,false);
 $m->ApplyChanges();
 $m->feedback(false,false);$m->event(36019);$m->attrs['LCNLastDispatch']='{}';
-$GLOBALS['simVars'][55944]['value']=false;
+$GLOBALS['simVars'][28550]['value']=false;
 $before=count($GLOBALS['simActions']);
 check(!$m->Command('AUF') && count($GLOBALS['simActions'])===$before,'No drive while STOP contact open');
-$GLOBALS['simVars'][55944]['value']=true;
-check($m->ProcessLCNInput(35739,'034001') && end($GLOBALS['simActions'])===[44228,true],'C2 long unchanged: AUF');
+$GLOBALS['simVars'][28550]['value']=true;
+check($m->ProcessLCNInput(35739,'034001') && end($GLOBALS['simActions'])===[23120,true],'C2 long unchanged: AUF');
 
 
 // End-to-end simulated path from EM172 feedback through existing watchdog
 // to the actual color/effect JSON on both WLED controllers.
-$GLOBALS['simVars'][44228]['value']=false;
+$GLOBALS['simVars'][23120]['value']=false;
 $m->attrs['MotionPendingUntil']=0;
 $m->feedback(false,false);$m->event(36019);
 mkVar(80004,VARIABLETYPE_INTEGER,(int)$m->values['Signal'],false);
@@ -846,5 +846,41 @@ $GLOBALS['simVars'][80103]['value']=false;$m->event(80103);
 check(!$m->attrs['MotionFeedbackOK']&&$m->values['Signal']===0,'Selected online event handles outage');
 $m->props['MotionFeedbackEnabled']=false;$m->ApplyChanges();
 check(!isset($m->messages[80101])&&isset($m->messages[35739]),'Disable removes motion events only');
+
+
+// Recreated Pro 3 output variables: upgrade existing configuration with obsolete IDs.
+resetHardware();
+$GLOBALS['simLCNModules']=[30888,14386,22849];
+$GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,23120=>22849,11571=>22849,28550=>22849,17585=>22849,13220=>22849,21923=>22849,36019=>14386,41452=>14386,53400=>14386];
+mkVar(35739,VARIABLETYPE_STRING,'034002',false);
+mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);mkVar(21923,VARIABLETYPE_BOOLEAN,true,false);
+mkVar(36019,VARIABLETYPE_BOOLEAN,false,false);mkVar(41452,VARIABLETYPE_BOOLEAN,false,false);mkVar(53400,VARIABLETYPE_BOOLEAN,true,false);
+$upgrade=new JVGaragentor();$upgrade->InstanceID=15957;$upgrade->Create();
+check($upgrade->props['RelayOpenVariable']===23120 && $upgrade->props['RelayCloseVariable']===11571 && $upgrade->props['RelayStopVariable']===28550,'New relay defaults');
+$upgrade->props['RelayOpenVariable']=44228;$upgrade->props['RelayCloseVariable']=56652;$upgrade->props['RelayStopVariable']=55944;
+$upgrade->props['EnableControl']=true;$upgrade->props['LCNGarageEnabled']=true;
+$upgrade->ApplyChanges();
+check($upgrade->RelayMigrationReady(),'Legacy missing output IDs qualify for automatic migration');
+check(count($GLOBALS['simActions'])===0,'Migration does not send relay actions');
+check(!$upgrade->Command('AUF'),'Old invalid IDs block commands until migration');
+$GLOBALS['simVars'][36019]['value']=true;check(!$upgrade->RelayMigrationReady(),'No automatic migration during actual motion');
+$GLOBALS['simVars'][36019]['value']=false;
+$GLOBALS['simVars'][28550]['value']=false;check(!$upgrade->RelayMigrationReady(),'No migration with open STOP contact');
+$GLOBALS['simVars'][28550]['value']=true;
+$GLOBALS['simLCNParents'][23120]=12345;check(!$upgrade->RelayMigrationReady(),'Wrong parent rejects migration');
+$GLOBALS['simLCNParents'][23120]=22849;
+$upgrade->props['RelayOpenVariable']=98765;check(!$upgrade->RelayMigrationReady(),'Manual unrelated mapping not overwritten');
+$upgrade->props['RelayOpenVariable']=44228;
+mkVar(44228,VARIABLETYPE_BOOLEAN,false);check(!$upgrade->RelayMigrationReady(),'Existing old object prevents automatic remap');unset($GLOBALS['simVars'][44228]);
+$upgrade->InstanceID=12345;check(!$upgrade->RelayMigrationReady(),'Other instance not migrated');$upgrade->InstanceID=15957;
+check($upgrade->RelayMigrationReady(),'Known safe mapping again qualifies');
+$upgrade->props['RelayOpenVariable']=23120;$upgrade->props['RelayCloseVariable']=11571;$upgrade->props['RelayStopVariable']=28550;
+$upgrade->ApplyChanges();
+check(!$upgrade->RelayMigrationReady() && count($GLOBALS['simActions'])===0,'After configuration write migration is done without replay');
+check($upgrade->Command('AUF') && end($GLOBALS['simActions'])===[23120,true],'New O1 used');
+$GLOBALS['simVars'][23120]['value']=false;$GLOBALS['simVars'][36019]['value']=true;$upgrade->Monitor();
+check($upgrade->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[28550,false],'New O3 used for actual motion STOP');
+$GLOBALS['simVars'][28550]['value']=true;$GLOBALS['simVars'][36019]['value']=false;$GLOBALS['simVars'][21923]['value']=false;$upgrade->Monitor();$upgrade->attrs['LCNLastDispatch']='{}';
+check($upgrade->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[11571,true],'New O2 used at standstill');
 
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

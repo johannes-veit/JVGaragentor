@@ -6,7 +6,7 @@
     },
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.2.11 – Fahrtrichtung über Symcon-Variablen des Shelly i4, ohne HTTP-Polling."
+      "caption": "JV Garagentor v1.2.12 – Fahrtrichtung über Symcon-Variablen des Shelly i4, ohne HTTP-Polling."
     },
     {
       "type": "CheckBox",
@@ -50,17 +50,17 @@
     {
       "type": "SelectVariable",
       "name": "RelayOpenVariable",
-      "caption": "Shelly AUF – O1, Status, ID 44228"
+      "caption": "Shelly AUF – O1, Status, ID 23120"
     },
     {
       "type": "SelectVariable",
       "name": "RelayCloseVariable",
-      "caption": "Shelly ZU – O2, Status 1, ID 56652"
+      "caption": "Shelly ZU – O2, Status 1, ID 11571"
     },
     {
       "type": "SelectVariable",
       "name": "RelayStopVariable",
-      "caption": "Shelly STOP – O3, Status 2, ID 55944"
+      "caption": "Shelly STOP – O3, Status 2, ID 28550"
     },
     {
       "type": "SelectVariable",
@@ -85,7 +85,7 @@
     },
     {
       "type": "Label",
-      "caption": "Bestehende Garage #15957: bekannte falsch gespeicherte Status-/Endlagen-IDs werden nur bei bestätigtem Shelly #22849 korrigiert. Eingangsstatus AUF 13220 / ZU 21923; Status 44228/56652/55944 sind nur Relais."
+      "caption": "Bestehende Garage #15957: bekannte falsch gespeicherte Status-/Endlagen-IDs werden nur bei bestätigtem Shelly #22849 korrigiert. Eingangsstatus AUF 13220 / ZU 21923; Status 23120/11571/28550 sind nur Relais."
     },
     {
       "type": "CheckBox",

@@ -24,9 +24,9 @@ class JVGaragentor extends IPSModuleStrict
         $this->RegisterPropertyBoolean('EnableControl', false);
         $this->LCNCreate();
         $this->MotionCreate();
-        $this->RegisterPropertyInteger('RelayOpenVariable', 44228);
-        $this->RegisterPropertyInteger('RelayCloseVariable', 56652);
-        $this->RegisterPropertyInteger('RelayStopVariable', 55944);
+        $this->RegisterPropertyInteger('RelayOpenVariable', 23120);
+        $this->RegisterPropertyInteger('RelayCloseVariable', 11571);
+        $this->RegisterPropertyInteger('RelayStopVariable', 28550);
         $this->RegisterPropertyInteger('OnlineVariable', 17585);
         $this->RegisterPropertyInteger('EndOpenVariable', self::END_OPEN_ID);
         $this->RegisterPropertyInteger('EndCloseVariable', self::END_CLOSE_ID);
@@ -44,6 +44,7 @@ class JVGaragentor extends IPSModuleStrict
         $this->RegisterAttributeBoolean('NeedsStop', false);
         $this->RegisterAttributeString('LastSnapshot', '');
         $this->RegisterTimer('Monitor', 1000, 'JVG_Monitor($_IPS["TARGET"]);');
+        $this->RegisterTimer('RelayIDMigration', 0, ' $id = $_IPS["TARGET"]; if (!IPS_HasChanges($id) && JVG_RelayMigrationReady($id)) { if (IPS_SetProperty($id, "RelayOpenVariable", 23120) && IPS_SetProperty($id, "RelayCloseVariable", 11571) && IPS_SetProperty($id, "RelayStopVariable", 28550)) { IPS_ApplyChanges($id); } }');
         $this->SetVisualizationType(1);
     }
 
@@ -60,6 +61,7 @@ class JVGaragentor extends IPSModuleStrict
         $this->MotionApplyChanges();
         $this->Monitor();
         $this->LCNScheduleCommission();
+        $this->SetTimerInterval('RelayIDMigration', $this->RelayMigrationCandidate() ? 1000 : 0);
     }
 
     /** Derselbe Eingang für Kachel, Skripte, später LCN-GT2: JVG_Command(id, 'ZU'). */
@@ -375,13 +377,13 @@ class JVGaragentor extends IPSModuleStrict
         // Repair only known legacy mistakes on the explicitly commissioned garage.
         // A different installation or unknown ID is never guessed.
         $legacy = $this->InstanceID === 15957 &&
-            in_array($id, [0,44228,56652,55944,17585,self::END_OPEN_ID,self::END_CLOSE_ID], true);
+            in_array($id, [0,23120,11571,28550,44228,56652,55944,17585,self::END_OPEN_ID,self::END_CLOSE_ID], true);
         $expected = $property === 'EndOpenVariable' ? self::END_OPEN_ID : self::END_CLOSE_ID;
         if ($id === $expected || ($id !== 0 && !$legacy)) return $id;
         $ids = $this->RelayIds();
-        if ($ids['AUF'] !== 44228 || $ids['ZU'] !== 56652 || $ids['STOP'] !== 55944 ||
+        if ($ids['AUF'] !== 23120 || $ids['ZU'] !== 11571 || $ids['STOP'] !== 28550 ||
             $this->ReadPropertyInteger('OnlineVariable') !== 17585) return 0;
-        foreach ([44228, 56652, 55944, 17585, self::END_OPEN_ID, self::END_CLOSE_ID] as $known) {
+        foreach ([23120, 11571, 28550, 17585, self::END_OPEN_ID, self::END_CLOSE_ID] as $known) {
             if (!$this->ValidVariable($known, VARIABLETYPE_BOOLEAN) ||
                 IPS_GetParent($known) !== self::SHELLY_INSTANCE) return 0;
         }
@@ -395,12 +397,49 @@ class JVGaragentor extends IPSModuleStrict
         // Ausgangsstatus, Online-Status, doppelte oder vertauschte bekannte Endlagen ablehnen.
         if (!$this->ValidVariable($id, VARIABLETYPE_BOOLEAN) || $id === $other ||
             in_array($id, array_values($this->RelayIds()), true) ||
-            in_array($id, [44228, 56652, 55944, 17585, $this->ReadPropertyInteger('OnlineVariable')], true)) return null;
+            in_array($id, [23120, 11571, 28550, 44228, 56652, 55944, 17585, $this->ReadPropertyInteger('OnlineVariable')], true)) return null;
         if (in_array($id, [self::END_OPEN_ID, self::END_CLOSE_ID], true)) {
             $expected = $property === 'EndOpenVariable' ? self::END_OPEN_ID : self::END_CLOSE_ID;
             if ($id !== $expected || IPS_GetParent($id) !== self::SHELLY_INSTANCE) return null;
         }
         return GetValueBoolean($id);
+    }
+
+    /** Repair only the explicitly confirmed garage and missing former output IDs.
+     * Never choose by name, never override another manual mapping.
+     */
+    private function RelayMigrationCandidate(): bool
+    {
+        if ($this->InstanceID !== 15957 || $this->ReadPropertyInteger('OnlineVariable') !== 17585 ||
+            $this->ReadPropertyInteger('EndOpenVariable') !== self::END_OPEN_ID ||
+            $this->ReadPropertyInteger('EndCloseVariable') !== self::END_CLOSE_ID) return false;
+        $actual = $this->RelayIds();
+        $old = ['AUF'=>44228,'STOP'=>55944,'ZU'=>56652];
+        $new = ['AUF'=>23120,'STOP'=>28550,'ZU'=>11571];
+        if ($actual === $new) return false;
+        foreach ($new as $command=>$id) {
+            if ($actual[$command] !== $id &&
+                ($actual[$command] !== $old[$command] || IPS_ObjectExists($old[$command]))) return false;
+            if (!$this->HasAction($id) || IPS_GetParent($id) !== self::SHELLY_INSTANCE) return false;
+        }
+        foreach ([17585,self::END_OPEN_ID,self::END_CLOSE_ID] as $id) {
+            if (!$this->ValidVariable($id, VARIABLETYPE_BOOLEAN) ||
+                IPS_GetParent($id) !== self::SHELLY_INSTANCE) return false;
+        }
+        return true;
+    }
+
+    /** Separate timer writes only configuration, not relay outputs. */
+    public function RelayMigrationReady(): bool
+    {
+        if (!$this->RelayMigrationCandidate()) {
+            $this->SetTimerInterval('RelayIDMigration', 0);
+            return false;
+        }
+        if (!$this->IsOnline() || GetValueBoolean(23120) || GetValueBoolean(11571) ||
+            !GetValueBoolean(28550) || $this->ResolvedEnd() === null ||
+            ($this->MotionEnabled() && $this->MotionRead() !== 0)) return false;
+        return true;
     }
 
     private function RelayIds(): array

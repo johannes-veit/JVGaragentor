@@ -1,82 +1,113 @@
 <?php
 declare(strict_types=1);
 
-/** Actual direction from EM 172 Q1/Q2 via the dedicated, local Shelly i4.
- *  No commands to the i4; no dependency on the Shelly cloud or MQTT instance IDs.
+/** EM 172 direction via existing IP-Symcon ShellyDevice variables.
+ * No HTTP, MQTT client or direct connection to the i4 in this module.
  */
 trait JVMotionFeedbackTrait
 {
     private const MOTION_WARNING = 'Fahrtrichtung: ';
-    private const KNOWN_MOTION_MAC_HASH = '52e7d7656a3b4e5e8824214e88413dd1d0ac5c6982a2734fdab74499c31dccb7';
+    private const MOTION_OPEN_ID = 36019;
+    private const MOTION_CLOSE_ID = 41452;
+    private const MOTION_ONLINE_ID = 53400;
+    private const MOTION_INSTANCE = 14386;
 
     private function MotionCreate(): void
     {
-        $this->RegisterPropertyString('MotionFeedbackHost', 'auto');
+        $this->RegisterPropertyBoolean('MotionFeedbackEnabled', $this->InstanceID === 15957);
+        $this->RegisterPropertyInteger('MotionOpenVariable', self::MOTION_OPEN_ID);
+        $this->RegisterPropertyInteger('MotionCloseVariable', self::MOTION_CLOSE_ID);
+        $this->RegisterPropertyInteger('MotionOnlineVariable', self::MOTION_ONLINE_ID);
+        $this->RegisterPropertyBoolean('MotionLCNShortStop', true);
         $this->RegisterAttributeBoolean('MotionFeedbackOK', false);
         $this->RegisterAttributeInteger('MotionPendingUntil', 0);
+        $this->RegisterAttributeString('MotionSubscriptions', '[]');
+        $this->RegisterAttributeString('MotionMapping', '');
     }
 
-    private function MotionHost(): string
+    private function MotionEnabled(): bool
     {
-        $host = trim($this->ReadPropertyString('MotionFeedbackHost'));
-        if ($host === 'auto') {
-            return $this->InstanceID === 15957 ? '192.168.103.93' : '';
+        return $this->ReadPropertyBoolean('MotionFeedbackEnabled');
+    }
+
+    private function MotionIds(): array
+    {
+        return [$this->ReadPropertyInteger('MotionOpenVariable'),
+            $this->ReadPropertyInteger('MotionCloseVariable'),
+            $this->ReadPropertyInteger('MotionOnlineVariable')];
+    }
+
+    private function MotionMappingValid(): bool
+    {
+        $ids = $this->MotionIds();
+        if (count(array_unique($ids)) !== 3) return false;
+        $forbidden = array_merge(array_values($this->RelayIds()), [
+            $this->EndVariableId('EndOpenVariable'), $this->EndVariableId('EndCloseVariable'),
+            $this->ReadPropertyInteger('OnlineVariable')
+        ]);
+        foreach ($ids as $id) {
+            if (!$this->ValidVariable($id, VARIABLETYPE_BOOLEAN) || in_array($id, $forbidden, true)) return false;
         }
-        return $host === 'off' ? '' : $host;
+        $parent = IPS_GetParent($ids[0]);
+        if ($parent <= 0 || !IPS_InstanceExists($parent) ||
+            IPS_GetParent($ids[1]) !== $parent || IPS_GetParent($ids[2]) !== $parent) return false;
+        $known = [self::MOTION_OPEN_ID, self::MOTION_CLOSE_ID, self::MOTION_ONLINE_ID];
+        // Known IDs must not be interchanged. A completely different ShellyDevice
+        // can be selected explicitly, with all three variables under one instance.
+        if (array_intersect($ids, $known) !== [] &&
+            ($ids !== $known || $parent !== self::MOTION_INSTANCE)) return false;
+        return true;
     }
 
-    /** Bounded read of both inputs in one snapshot, never two separate requests. */
-    protected function MotionHttpStatus(string $host): ?array
+    private function MotionApplyChanges(): void
     {
-        if (!filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ||
-            !function_exists('curl_init')) return null;
-        $curl = curl_init('http://' . $host . '/rpc/Shelly.GetStatus');
-        if ($curl === false) return null;
-        try {
-            curl_setopt_array($curl, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_CONNECTTIMEOUT_MS => 180,
-                CURLOPT_TIMEOUT_MS => 350,
-                CURLOPT_NOSIGNAL => true,
-                CURLOPT_FOLLOWLOCATION => false,
-                CURLOPT_PROXY => '',
-                CURLOPT_HTTPHEADER => ['Accept: application/json']
-            ]);
-            $body = curl_exec($curl);
-            if (!is_string($body) || curl_getinfo($curl, CURLINFO_HTTP_CODE) !== 200) return null;
-            $doc = json_decode($body, true);
-            return is_array($doc) ? $doc : null;
-        } catch (Throwable $e) {
-            return null;
-        } finally {
-            curl_close($curl);
+        $old = json_decode($this->ReadAttributeString('MotionSubscriptions'), true);
+        $old = is_array($old) ? array_map('intval', $old) : [];
+        $wanted = [];
+        if ($this->MotionEnabled()) {
+            foreach (array_merge($this->MotionIds(), [
+                $this->EndVariableId('EndOpenVariable'), $this->EndVariableId('EndCloseVariable'),
+                $this->ReadPropertyInteger('OnlineVariable')
+            ]) as $id) {
+                if ($this->ValidVariable($id, VARIABLETYPE_BOOLEAN)) $wanted[] = $id;
+            }
+        }
+        $wanted = array_values(array_unique($wanted));
+        foreach (array_unique(array_merge($old, $wanted)) as $id) {
+            $this->UnregisterMessage($id, VM_UPDATE);
+        }
+        foreach ($wanted as $id) $this->RegisterMessage($id, VM_UPDATE);
+        $this->WriteAttributeString('MotionSubscriptions', json_encode($wanted) ?: '[]');
+        $mapping = json_encode([$this->MotionEnabled(), $this->MotionIds()]) ?: '';
+        if ($mapping !== $this->ReadAttributeString('MotionMapping')) {
+            $this->WriteAttributeString('MotionMapping', $mapping);
+            $this->WriteAttributeBoolean('StateInitialized', false);
+            $this->WriteAttributeBoolean('MotionFeedbackOK', false);
+            $this->WriteAttributeInteger('MovementStarted', 0);
+            $this->WriteAttributeInteger('MotionPendingUntil', 0);
         }
     }
 
-    /** 0=standing, 1=opening, 3=closing, null=invalid/unavailable.
-     *  Require actual booleans, not casts of null, strings or missing fields.
-     */
-    protected function MotionExpectedMacHash(): string
+    private function MotionMessage(int $sender): bool
     {
-        return self::KNOWN_MOTION_MAC_HASH;
+        if (!$this->MotionEnabled()) return false;
+        $ids = json_decode($this->ReadAttributeString('MotionSubscriptions'), true);
+        if (!is_array($ids) || !in_array($sender, $ids, true)) return false;
+        // Read actual current Symcon values, not the possibly superseded event payload.
+        $this->MotionMonitor();
+        return true;
     }
 
+    /** 0=standing, 1=opening, 3=closing, null=invalid/offline. */
     private function MotionRead(): ?int
     {
-        $doc = $this->MotionHttpStatus($this->MotionHost());
-        if (!is_array($doc)) return null;
-        if ($this->InstanceID === 15957 && $this->MotionHost() === '192.168.103.93') {
-            $mac = $doc['sys']['mac'] ?? null;
-            if (!is_string($mac) ||
-                hash('sha256', strtoupper(str_replace(':', '', $mac))) !== $this->MotionExpectedMacHash()) return null;
-        }
-        $up = $doc['input:0'] ?? null;
-        $down = $doc['input:1'] ?? null;
-        if (!is_array($up) || !is_array($down) ||
-            ($up['id'] ?? null) !== 0 || ($down['id'] ?? null) !== 1 ||
-            !is_bool($up['state'] ?? null) || !is_bool($down['state'] ?? null) ||
-            ($up['state'] && $down['state'])) return null;
-        return $up['state'] ? 1 : ($down['state'] ? 3 : 0);
+        if (!$this->MotionMappingValid()) return null;
+        [$upID, $downID, $onlineID] = $this->MotionIds();
+        if (!GetValueBoolean($onlineID)) return null;
+        $up = GetValueBoolean($upID);
+        $down = GetValueBoolean($downID);
+        if ($up && $down) return null;
+        return $up ? 1 : ($down ? 3 : 0);
     }
 
     private function MotionClearWarning(): void

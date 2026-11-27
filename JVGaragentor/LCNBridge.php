@@ -145,9 +145,9 @@ trait JVLCNBridgeTrait
 
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
-        if ($Message !== VM_UPDATE || !$this->ValidVariable($SenderID, VARIABLETYPE_STRING)) {
-            return;
-        }
+        if ($Message !== VM_UPDATE) return;
+        if ($this->MotionMessage($SenderID)) return;
+        if (!$this->ValidVariable($SenderID, VARIABLETYPE_STRING)) return;
         // VM_UPDATE carries the value of this specific telegram. Reading the
         // variable again can return the following LOS telegram instead.
         if (!isset($Data[0]) || !is_string($Data[0])) {
@@ -242,7 +242,8 @@ trait JVLCNBridgeTrait
             // Gleiche Prüfung wie in der Visualisierung, niemals Bypass.
             // The configured garage short=ZU becomes STOP during real motion,
             // or if motion cannot be excluded. C1/Schiebetor is unchanged.
-            if ($hit['gesture'] === 'KURZ' && $action === 'ZU' && $this->MotionHost() !== '') {
+            if ($hit['gesture'] === 'KURZ' && $action === 'ZU' && $this->MotionEnabled() &&
+                $this->ReadPropertyBoolean('MotionLCNShortStop')) {
                 $ok = $this->CommandInternal($action, true, $action);
             } else {
                 $ok = $this->Command($action);
@@ -307,6 +308,9 @@ trait JVLCNBridgeTrait
         if (!is_array($form)) {
             return '{"elements":[],"actions":[]}';
         }
+        $form['elements'][] = ['type'=>'Label', 'caption'=>'Fahrtrichtung: ' .
+            ($this->MotionEnabled() ? ($this->MotionMappingValid() ? 'Symcon-Zuordnung gültig' : 'Zuordnung ungültig') : 'deaktiviert (Altmodus)') .
+            '. AUF #' . $this->MotionIds()[0] . ' / ZU #' . $this->MotionIds()[1] . ' / Online #' . $this->MotionIds()[2]];
         foreach (['Garage' => 'Garagentor', 'Schiebe' => 'Schiebetor'] as $channel => $title) {
             $table = $this->ReadPropertyString('LCN' . $channel . 'Table');
             $key = $this->ReadPropertyInteger('LCN' . $channel . 'Key');

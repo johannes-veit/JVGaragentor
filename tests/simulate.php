@@ -635,7 +635,7 @@ $GLOBALS['simLCNModules']=[30888];
 $GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,44228=>22849,56652=>22849,55944=>22849,17585=>22849,13220=>22849,21923=>22849];
 mkVar(35739,VARIABLETYPE_STRING,'034001',false);
 mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);mkVar(21923,VARIABLETYPE_BOOLEAN,true,false);
-$commission=new JVGaragentor();$commission->InstanceID=15957;$commission->Create();$commission->props['MotionFeedbackHost']='off';
+$commission=new JVGaragentor();$commission->InstanceID=15957;$commission->Create();$commission->props['MotionFeedbackEnabled']=false;
 $commission->props['EnableControl']=true;$commission->props['EndOpenVariable']=0;$commission->props['EndCloseVariable']=0;
 $commission->props['RequireEndStops']=false;$commission->props['LCNSchiebeEnabled']=true;
 $commission->ApplyChanges();
@@ -672,7 +672,7 @@ $GLOBALS['simLCNModules']=[30888];
 $GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,44228=>22849,56652=>22849,55944=>22849,17585=>22849,13220=>22849,21923=>22849];
 mkVar(35739,VARIABLETYPE_STRING,'034000',false);
 mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);mkVar(21923,VARIABLETYPE_BOOLEAN,true,false);
-$repair=new JVGaragentor();$repair->InstanceID=15957;$repair->Create();$repair->props['MotionFeedbackHost']='off';
+$repair=new JVGaragentor();$repair->InstanceID=15957;$repair->Create();$repair->props['MotionFeedbackEnabled']=false;
 $repair->props['EnableControl']=true;$repair->props['EndOpenVariable']=44228;$repair->props['EndCloseVariable']=56652;
 $repair->ApplyChanges();
 check($repair->values['Position']==='ZU','Bekannte Status-Verwechslung korrigiert: Endlage aus Eingangsstatus');
@@ -691,18 +691,15 @@ check(count($GLOBALS['simActions'])===$before,'Fehlende Ereignisdaten spielen ke
 $other=new JVGaragentor();$other->Create();$other->props['EndOpenVariable']=44228;$other->props['EndCloseVariable']=56652;$other->props['EnableControl']=true;$other->ApplyChanges();
 check(!$other->Command('AUF'),'Fremde Instanz mit Status statt Eingangsstatus bleibt gesperrt');
 
-// EM 172 direction feedback: test the actual module with a mocked HTTP response.
+// EM 172: exercise actual Symcon variables and VM_UPDATE messages.
 class MotionTestGate extends JVGaragentor {
-    public ?array $motionDoc = null;
-    public array $motionHosts = [];
-    protected function MotionHttpStatus(string $host): ?array {
-        $this->motionHosts[] = $host;
-        return $this->motionDoc;
+    public function feedback(bool $up, bool $down, bool $online=true): void {
+        $GLOBALS['simVars'][36019]['value']=$up;
+        $GLOBALS['simVars'][41452]['value']=$down;
+        $GLOBALS['simVars'][53400]['value']=$online;
     }
-    protected function MotionExpectedMacHash(): string { return hash('sha256','020000000001'); }
-    public function feedback(bool $up, bool $down): void {
-        $this->motionDoc = ['sys'=>['mac'=>'020000000001'],
-            'input:0'=>['id'=>0,'state'=>$up], 'input:1'=>['id'=>1,'state'=>$down]];
+    public function event(int $id): void {
+        $this->MessageSink(time(),$id,VM_UPDATE,[GetValueBoolean($id),true]);
     }
 }
 resetHardware();
@@ -711,12 +708,23 @@ $GLOBALS['simLCNParents']=[35739=>30888,30888=>37682,37682=>0,44228=>22849,56652
 mkVar(35739,VARIABLETYPE_STRING,'034002',false);
 mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);
 mkVar(21923,VARIABLETYPE_BOOLEAN,true,false);
+$GLOBALS['simLCNModules'][]=14386;
+$GLOBALS['simLCNParents'] += [36019=>14386,41452=>14386,53400=>14386];
+mkVar(36019,VARIABLETYPE_BOOLEAN,false,false);
+mkVar(41452,VARIABLETYPE_BOOLEAN,false,false);
+mkVar(53400,VARIABLETYPE_BOOLEAN,true,false);
 $m=new MotionTestGate();$m->InstanceID=15957;$m->Create();
 $m->props['EnableControl']=true;$m->props['LCNGarageEnabled']=true;
 $m->feedback(false,false);$m->ApplyChanges();
-check($m->props['MotionFeedbackHost']==='auto' && end($m->motionHosts)==='192.168.103.93','Migration: i4 automatic without reconfiguration');
+check($m->props['MotionFeedbackEnabled']===true &&
+    $m->props['MotionOpenVariable']===36019 && $m->props['MotionCloseVariable']===41452 &&
+    $m->props['MotionOnlineVariable']===53400 && $m->props['MotionLCNShortStop']===true,'Migration: confirmed Symcon IDs preconfigured');
+foreach ([36019,41452,53400,13220,21923,17585,35739] as $id)
+    check(($m->messages[$id]??0)===VM_UPDATE,'Event subscription #'.$id);
+$m->messages=[];$m->ApplyChanges();
+check(($m->messages[36019]??0)===VM_UPDATE && ($m->messages[35739]??0)===VM_UPDATE,'Reapply restores motion and LCN events');
 check($m->values['Position']==='ZU' && $m->values['Signal']===0 && count($GLOBALS['simActions'])===0,'Startup idle no replay/no relay');
-$m->feedback(true,false);$m->Monitor();
+$m->feedback(true,false);$m->event(36019);
 check($m->values['Position']==='LÄUFT AUF' && $m->values['Signal']===1,'External AUF even while departing end contact remains on');
 check(count($GLOBALS['simActions'])===0,'External motion detected without relay command');
 $motionSnapshot=json_decode(end($m->sent),true);
@@ -726,7 +734,7 @@ $GLOBALS['simVars'][21923]['value']=false;
 check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'C2 short during external opening sends STOP');
 check($m->values['Signal']===1,'STOP command not mistaken for actual standstill');
 $GLOBALS['simVars'][55944]['value']=true;
-$m->feedback(false,false);$m->Monitor();
+$m->feedback(false,false);$m->event(36019);
 check($m->values['Position']==='GESTOPPT' && $m->values['Signal']===0,'Actual intermediate stop');
 $m->attrs['LCNLastDispatch']='{}';
 check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[56652,true],'C2 short at standstill sends close');
@@ -735,23 +743,23 @@ $GLOBALS['simVars'][56652]['value']=false;
 $m->attrs['LCNLastDispatch']='{}';
 check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'Short while command pending sends STOP');
 $GLOBALS['simVars'][55944]['value']=true;
-$m->feedback(false,true);$m->Monitor();
+$m->feedback(false,true);$m->event(41452);
 check($m->values['Position']==='LÄUFT ZU' && $m->values['Signal']===3,'External ZU signal');
 $m->attrs['LCNLastDispatch']='{}';
 check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'C2 short during external closing sends STOP');
 $GLOBALS['simVars'][55944]['value']=true;
-$m->feedback(true,false);$m->Monitor();
+$m->feedback(true,false);$m->event(36019);
 check($m->values['Signal']===1,'External reversal from closing to opening');
 $m->attrs['MovementStarted']=time()-130;$m->Monitor();
 check($m->values['Signal']===1 && $m->attrs['NeedsStop'],'Timeout does not fake stop while motion proven');
 $motionSnapshot=json_decode(end($m->sent),true);
 check($motionSnapshot['effectUntil']>=time()+3,'Kachel remains lit even after movement timeout if feedback still valid');
-$m->feedback(false,false);$GLOBALS['simVars'][13220]['value']=true;$m->Monitor();
+$m->feedback(false,false);$GLOBALS['simVars'][13220]['value']=true;$m->event(13220);
 check($m->values['Position']==='AUF' && $m->values['Signal']===2,'End AUF green after external drive');
 $m->attrs['SignalUntil']=time()-1;$m->Monitor();
 check($m->values['Signal']===0 && $m->values['Position']==='AUF','Existing hold time retained');
 $GLOBALS['simVars'][13220]['value']=false;
-$m->feedback(false,true);$m->Monitor();$m->feedback(false,false);$GLOBALS['simVars'][21923]['value']=true;$m->Monitor();
+$m->feedback(false,true);$m->event(41452);$m->feedback(false,false);$GLOBALS['simVars'][21923]['value']=true;$m->event(21923);
 check($m->values['Signal']===4 && $m->values['Position']==='ZU','End ZU red after external drive');
 $GLOBALS['simVars'][21923]['value']=false;
 $m->feedback(true,true);$m->Monitor();
@@ -761,15 +769,24 @@ check(!$m->Command('ZU') && count($GLOBALS['simActions'])===$before,'Invalid fee
 $m->attrs['LCNLastDispatch']='{}';
 check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[55944,false],'Short with invalid feedback only sends STOP');
 $GLOBALS['simVars'][55944]['value']=true;
-$m->motionDoc=null;$m->Monitor();
+$GLOBALS['simVars'][53400]['value']=false;$m->event(53400);
 check(!$m->attrs['MotionFeedbackOK'] && $m->values['Signal']===0,'Lost i4 cannot display stale movement or green');
-$m->feedback(false,true);$m->Monitor();
+$m->feedback(false,true);$m->event(41452);
 check($m->attrs['MotionFeedbackOK'] && $m->values['Signal']===3,'Recovery during motion restores signal');
-$m->motionDoc['sys']['mac']='000000000000';$m->Monitor();
-check(!$m->attrs['MotionFeedbackOK'],'Wrong device at configured IP rejected');
-$m->feedback(false,false);$m->motionDoc['input:0']['state']=null;$m->Monitor();
-check(!$m->attrs['MotionFeedbackOK'],'Null is not standstill');
-$m->feedback(false,false);$m->Monitor();$m->attrs['LCNLastDispatch']='{}';
+$GLOBALS['simLCNParents'][36019]=999;$m->Monitor();
+check(!$m->attrs['MotionFeedbackOK'],'Wrong parent rejected');
+$GLOBALS['simLCNParents'][36019]=14386;
+$m->props['MotionOpenVariable']=41452;$m->props['MotionCloseVariable']=36019;$m->Monitor();
+check(!$m->attrs['MotionFeedbackOK'],'Known directions cannot be swapped');
+$m->props['MotionOpenVariable']=36019;$m->props['MotionCloseVariable']=41452;
+$m->props['MotionOnlineVariable']=36019;$m->Monitor();
+check(!$m->attrs['MotionFeedbackOK'],'Duplicate online variable rejected');
+$m->props['MotionOnlineVariable']=53400;
+unset($GLOBALS['simVars'][36019]);$m->Monitor();
+check(!$m->attrs['MotionFeedbackOK'],'Missing variable is not standstill');
+mkVar(36019,VARIABLETYPE_BOOLEAN,false,false);
+$m->ApplyChanges();
+$m->feedback(false,false);$m->event(36019);$m->attrs['LCNLastDispatch']='{}';
 $GLOBALS['simVars'][55944]['value']=false;
 $before=count($GLOBALS['simActions']);
 check(!$m->Command('AUF') && count($GLOBALS['simActions'])===$before,'No drive while STOP contact open');
@@ -781,7 +798,7 @@ check($m->ProcessLCNInput(35739,'034001') && end($GLOBALS['simActions'])===[4422
 // to the actual color/effect JSON on both WLED controllers.
 $GLOBALS['simVars'][44228]['value']=false;
 $m->attrs['MotionPendingUntil']=0;
-$m->feedback(false,false);$m->Monitor();
+$m->feedback(false,false);$m->event(36019);
 mkVar(80004,VARIABLETYPE_INTEGER,(int)$m->values['Signal'],false);
 $motionAmpel=new WdTestAmpel();$motionAmpel->Create();$motionAmpel->initWd();
 $motionAmpel->props['SignalVariable']=80004;$motionAmpel->props['EnableAmpel']=true;
@@ -798,22 +815,36 @@ function checkMotionScene(WdTestAmpel $ampel,array $color,bool $pulse,string $na
             ($pulse ? ($seg['fx']??0)!==0 : ($seg['fx']??-1)===0),$name.' '.$side);
     }
 }
-$m->feedback(true,false);$m->Monitor();publishMotionSignal($m,$motionAmpel);
+$m->feedback(true,false);$m->event(36019);publishMotionSignal($m,$motionAmpel);
 checkMotionScene($motionAmpel,[255,160,0,0],true,'EM172 AUF yellow pulse');
-$m->feedback(false,false);$GLOBALS['simVars'][13220]['value']=true;$m->Monitor();publishMotionSignal($m,$motionAmpel);
+$m->feedback(false,false);$GLOBALS['simVars'][13220]['value']=true;$m->event(13220);publishMotionSignal($m,$motionAmpel);
 checkMotionScene($motionAmpel,[0,255,0,0],false,'End AUF green');
 $GLOBALS['simVars'][13220]['value']=false;
-$m->feedback(false,true);$m->Monitor();publishMotionSignal($m,$motionAmpel);
+$m->feedback(false,true);$m->event(41452);publishMotionSignal($m,$motionAmpel);
 checkMotionScene($motionAmpel,[255,0,0,0],true,'EM172 ZU red pulse');
-$m->feedback(false,false);$GLOBALS['simVars'][21923]['value']=true;$m->Monitor();publishMotionSignal($m,$motionAmpel);
+$m->feedback(false,false);$GLOBALS['simVars'][21923]['value']=true;$m->event(21923);publishMotionSignal($m,$motionAmpel);
 checkMotionScene($motionAmpel,[255,0,0,0],false,'End ZU red');
 $GLOBALS['simVars'][21923]['value']=false;
-$m->feedback(true,false);$m->Monitor();publishMotionSignal($m,$motionAmpel);
-$m->motionDoc=null;$m->Monitor();publishMotionSignal($m,$motionAmpel);
+$m->feedback(true,false);$m->event(36019);publishMotionSignal($m,$motionAmpel);
+$GLOBALS['simVars'][53400]['value']=false;$m->event(53400);publishMotionSignal($m,$motionAmpel);
 check(!$motionAmpel->docs['front']['state']['on']&&!$motionAmpel->docs['rear']['state']['on'],'Feedback loss disables both WLED controllers');
-$m->feedback(true,false);$m->Monitor();publishMotionSignal($m,$motionAmpel);
+$m->feedback(true,false);$m->event(36019);publishMotionSignal($m,$motionAmpel);
 checkMotionScene($motionAmpel,[255,160,0,0],true,'Feedback recovered');
-$m->feedback(false,false);$m->Monitor();publishMotionSignal($m,$motionAmpel);
+$m->feedback(false,false);$m->event(36019);publishMotionSignal($m,$motionAmpel);
 check(!$motionAmpel->docs['front']['state']['on']&&!$motionAmpel->docs['rear']['state']['on'],'Confirmed intermediate stop disables both WLED');
+
+
+// Selectable alternate instance and event resubscription, without changing existing relay/LCN mappings.
+$GLOBALS['simLCNModules'][]=14387;
+$GLOBALS['simLCNParents'] += [80101=>14387,80102=>14387,80103=>14387];
+mkVar(80101,VARIABLETYPE_BOOLEAN,true,false);mkVar(80102,VARIABLETYPE_BOOLEAN,false,false);mkVar(80103,VARIABLETYPE_BOOLEAN,true,false);
+$m->props['MotionOpenVariable']=80101;$m->props['MotionCloseVariable']=80102;$m->props['MotionOnlineVariable']=80103;
+$before=count($GLOBALS['simActions']);$m->ApplyChanges();
+check($m->values['Signal']===1 && !isset($m->messages[36019]) && isset($m->messages[80101]),'Selectable mapping and subscriptions replace old ones');
+check(count($GLOBALS['simActions'])===$before && isset($m->messages[35739]),'Changing mapping does not send movement or lose LCN');
+$GLOBALS['simVars'][80103]['value']=false;$m->event(80103);
+check(!$m->attrs['MotionFeedbackOK']&&$m->values['Signal']===0,'Selected online event handles outage');
+$m->props['MotionFeedbackEnabled']=false;$m->ApplyChanges();
+check(!isset($m->messages[80101])&&isset($m->messages[35739]),'Disable removes motion events only');
 
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

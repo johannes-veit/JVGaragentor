@@ -6,12 +6,41 @@
     },
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.2.10 – tatsächliche Fahrtrichtung aus EM 172 / Shelly i4; automatische Vorbelegung für bestehende Instanz #15957."
+      "caption": "JV Garagentor v1.2.11 – Fahrtrichtung über Symcon-Variablen des Shelly i4, ohne HTTP-Polling."
     },
     {
-      "type": "ValidationTextBox",
-      "name": "MotionFeedbackHost",
-      "caption": "Fahrtrichtung: auto = vorhandene Garage #15957 / i4 .93; alternativ IP, off = alter Modus"
+      "type": "CheckBox",
+      "name": "MotionFeedbackEnabled",
+      "caption": "Reale Fahrtrichtung über Symcon aktivieren (EM 172 / Shelly i4)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "MotionOpenVariable",
+      "caption": "Öffnungsfahrt – SW1 Eingangsstatus (36019)",
+      "validVariableTypes": [
+        0
+      ]
+    },
+    {
+      "type": "SelectVariable",
+      "name": "MotionCloseVariable",
+      "caption": "Schließfahrt – SW2 Eingangsstatus (41452)",
+      "validVariableTypes": [
+        0
+      ]
+    },
+    {
+      "type": "SelectVariable",
+      "name": "MotionOnlineVariable",
+      "caption": "Shelly i4 Erreichbar (53400)",
+      "validVariableTypes": [
+        0
+      ]
+    },
+    {
+      "type": "CheckBox",
+      "name": "MotionLCNShortStop",
+      "caption": "Garagentor GT2: KURZ bei Fahrt = STOPP, im Stillstand = ZU"
     },
     {
       "type": "CheckBox",
@@ -70,7 +99,7 @@
     {
       "type": "NumberSpinner",
       "name": "MovementTimeoutSeconds",
-      "caption": "Fahr-/Blink-Timeout (Sekunden; max. 120)",
+      "caption": "Fahrzeit-Warnung (Sekunden; max. 120, reale Fahrt bleibt sichtbar)",
       "minimum": 5,
       "maximum": 120
     },
@@ -104,11 +133,11 @@
     },
     {
       "type": "Label",
-      "caption": "Fahrtsignale: AUF gelb pulsierend / ZU rot pulsierend bis Endlage oder Timeout (höchstens 120 s). Nach Endlage AUF 10 s grün, nach ZU 5 s rot; danach Ampel AUS, Positionsanzeige bleibt AUF bzw. ZU. STOP sofort AUS. Die Statuskachel verwendet denselben Signalwert. WLED-Pulsfrequenz separat im jeweiligen Preset anpassen."
+      "caption": "Fahrtsignale: AUF gelb pulsierend / ZU rot pulsierend bei realer Fahrt. Nach Endlage AUF bzw. ZU die eingestellte Nachleuchtzeit, dann AUS. Zwischenstopp = AUS; bei fehlender Rückmeldung keine Fahrt freigeben. Die Kachel nutzt denselben Signalwert. WLED-Pulsfrequenz in den Presets."
     },
     {
       "type": "Label",
-      "caption": "LCN-GT2 vorbereitet: JVG_Command(GARAGENTOR_INSTANZ_ID, 'ZU') bei kurz, JVG_Command(..., 'AUF') bei lang. Für die bestätigte Instanz #15957 automatisch freigeben, keine gespeicherten Telegramme ausführen."
+      "caption": "LCN-GT2: C2 KURZ = STOPP während realer Fahrt, sonst ZU; LANG = AUF; LOS = keine Aktion. Freigaben bleiben erhalten. Keine gespeicherten Telegramme ausführen."
     },
     {
       "type": "Label",
@@ -121,7 +150,7 @@
     {
       "type": "CheckBox",
       "name": "LCNGarageEnabled",
-      "caption": "LCN-GT2 Garagentor aktivieren (C2 KURZ ZU / LANG AUF)"
+      "caption": "LCN-GT2 Garagentor aktivieren (C2 KURZ STOPP/ZU, LANG AUF)"
     },
     {
       "type": "SelectInstance",

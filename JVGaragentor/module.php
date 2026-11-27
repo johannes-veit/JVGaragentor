@@ -55,8 +55,9 @@ class JVGaragentor extends IPSModuleStrict
         }
         $this->RegisterVariableString('Hinweis', 'Steuerung / Diagnose', [], 1);
         $this->RegisterVariableInteger('Signal', 'Ampel-Signal', [], 2);
-        $this->SetTimerInterval('Monitor', $this->MotionHost() !== '' ? 500 : 1000);
+        $this->SetTimerInterval('Monitor', 1000); // Local fallback / hold time / visualization only
         $this->LCNApplyChanges();
+        $this->MotionApplyChanges();
         $this->Monitor();
         $this->LCNScheduleCommission();
     }
@@ -91,9 +92,9 @@ class JVGaragentor extends IPSModuleStrict
                 return false;
             }
         }
-        $feedback = $this->MotionHost() !== '';
+        $feedback = $this->MotionEnabled();
         if ($feedback && ($command !== 'STOP' || $short)) {
-            // Read fresh direction for every decision, including an external drive
+            // Read current Symcon direction for every decision, including an external drive
             // that started since the last timer tick.
             $this->MotionMonitor();
             if ($short && (!$this->ReadAttributeBoolean('MotionFeedbackOK') ||
@@ -210,7 +211,7 @@ class JVGaragentor extends IPSModuleStrict
     public function Monitor(): void
     {
         $this->CheckPulse();
-        if ($this->MotionHost() !== '') {
+        if ($this->MotionEnabled()) {
             $this->MotionMonitor();
             return;
         }
@@ -440,7 +441,7 @@ class JVGaragentor extends IPSModuleStrict
         $deadline = 0;
         if (in_array($signal, [1, 3], true)) {
             $started = $this->ReadAttributeInteger('MovementStarted');
-            $deadline = $this->MotionHost() !== '' ? time() + 4 : ($started > 0 ? $started + $this->MovementTimeout() : 0);
+            $deadline = $this->MotionEnabled() ? time() + 4 : ($started > 0 ? $started + $this->MovementTimeout() : 0);
         } elseif (in_array($signal, [2, 4], true)) {
             $deadline = $this->ReadAttributeInteger('SignalUntil');
         }
@@ -452,7 +453,7 @@ class JVGaragentor extends IPSModuleStrict
             'warning' => $diagnostic,
             'enabled' => $this->ReadPropertyBoolean('EnableControl'),
             'ready' => !$requiredEndStopsMissing && !$this->ReadAttributeBoolean('NeedsStop') &&
-                ($this->MotionHost() === '' || ($this->ReadAttributeBoolean('MotionFeedbackOK') &&
+                (!$this->MotionEnabled() || ($this->ReadAttributeBoolean('MotionFeedbackOK') &&
                     $this->ReadAttributeInteger('MotionPendingUntil') <= time())),
             'online' => $this->IsOnline()
         ];

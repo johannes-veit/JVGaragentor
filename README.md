@@ -1,3 +1,7 @@
+## v1.2.11 – native Symcon-Fahrtrückmeldung
+
+ShellyDevice #14386: AUF #36019, ZU #41452, Erreichbar #53400. Alle drei IDs und die Fahrtrichtungs-/LCN-STOPP-Option sind im Konfigurationsformular editierbar, bei Torinstanz #15957 automatisch vorbelegt. VM_UPDATE für beide Richtungen, beide Endlagen und beide Online-Zustände; 1-s-Timer liest nur lokale Symcon-Variablen. Keine HTTP-Abfrage des i4 und keine zusätzliche MQTT-Verbindung. Bestehende Instanzen, LCN, Kachel, WLED-Presets und Nachleuchtzeiten unverändert. Die Symcon-Rückmeldung ersetzt keine Sicherheitseinrichtung und hängt von der Aktualität des ShellyDevice-Moduls ab. Die HTTP-Lösung der vorherigen Version ist ersetzt.
+
 ## v1.2.10 – Audit
 
 Kachel-Fahrtsignal mit erneuerter Vier-Sekunden-Gültigkeit, solange reale Fahrtrichtung gemeldet wird. Bei fehlender Verbindung zur Kachel erlischt die Farbe lokal. Fahrtbefehle bei noch offenem STOP-Kontakt gesperrt. Keine Konfigurationsänderung erforderlich.

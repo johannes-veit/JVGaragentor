@@ -88,11 +88,11 @@ push(3,'LÄUFT ZU',4);
 check(classes.has('jvg-red-flash'),'Actual closing uses renewable deadline as well');
 
 push(1,'LÄUFT AUF',4,{positionPercent:68,positionRemaining:27,positionEstimateUntil:Math.floor(fakeTime/1000)+4});
-check(percent.textContent==='ca. 68 %'&&eta.textContent==='Offen in 27 s','Opening position and ETA visible');
+check(percent.textContent==='68 %'&&eta.textContent==='Offen in 27 s','Opening position and ETA visible');
 push(3,'LÄUFT ZU',4,{positionPercent:68,positionRemaining:13,positionEstimateUntil:Math.floor(fakeTime/1000)+4});
-check(percent.textContent==='ca. 68 %'&&eta.textContent==='Geschlossen in 13 s','Closing ETA');
+check(percent.textContent==='68 %'&&eta.textContent==='Geschlossen in 13 s','Closing ETA');
 push(0,'GESTOPPT',0,{positionPercent:68,positionRemaining:-1});
-check(percent.textContent==='ca. 68 %'&&eta.textContent==='','Stopped position frozen, ETA hidden');
+check(percent.textContent==='68 %'&&eta.textContent==='','Stopped position frozen, ETA hidden');
 push(2,'AUF',10,{positionPercent:0,positionRemaining:-1});
 check(percent.textContent==='0 %'&&eta.textContent==='','Exact open end');
 push(4,'ZU',5,{positionPercent:100,positionRemaining:-1});
@@ -106,7 +106,7 @@ check(percent.textContent==='– %'&&eta.textContent==='','Unknown position neut
 push(0,'GESTOPPT',0,{positionPercent:50,online:false});
 check(percent.textContent==='– %','Offline does not display stale position');
 push(1,'LÄUFT AUF',4,{positionPercent:65,positionRemaining:26,positionEstimateUntil:1});
-check(percent.textContent==='ca. 65 %'&&eta.textContent==='Offen in 26 s','Phone clock offset does not hide fresh estimate');
+check(percent.textContent==='65 %'&&eta.textContent==='Offen in 26 s','Phone clock offset does not hide fresh estimate');
 push(1,'LÄUFT AUF',4,{positionPercent:65,positionRemaining:26,positionEstimateUntil:1,ready:false,transientWait:true});
 check(note.textContent===''&&buttons.find(b=>b.dataset.jvgCommand==='AUF').disabled&&!buttons.find(b=>b.dataset.jvgCommand==='STOP').disabled,'Transient wait has no false configuration warning, drive remains locked');
 push(0,'GESTOPPT',0,{ready:false,transientWait:false});

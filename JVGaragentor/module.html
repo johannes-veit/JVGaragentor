@@ -104,7 +104,7 @@
     // Relative heartbeat avoids clock skew between SymBox and phone.
     const fresh = !moving || (Number(latest.positionEstimateUntil || 0)>0 && Date.now()-receivedAt<4000);
     const valid = latest.online === true && fresh && Number.isInteger(p) && p >= 0 && p <= 100;
-    percentText.textContent = valid ? ((p>0 && p<100 ? 'ca. ' : '') + p + ' %') : '– %';
+    percentText.textContent = valid ? (p + ' %') : '– %';
     etaText.textContent = valid && moving && Number.isInteger(remaining) && remaining >= 0
       ? (remaining === 0 ? 'Endlage erwartet' : (latest.position === 'LÄUFT AUF' ? 'Offen in ' : 'Geschlossen in ') + remaining + ' s')
       : (moving && fresh && latest.online===true && p===-1 ? 'Endlage zur Referenz anfahren' : '');

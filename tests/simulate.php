@@ -1048,4 +1048,63 @@ check(!$fast->attrs['WatchdogPending']&&$fast->attrs['WatchdogLastSignal']===3 &
 $fast->requests=[];$fast->CheckSignal();
 check($fast->requests===[],'No duplicate traffic once pending color is handled');
 
+
+// Position estimator: exact elapsed time, stop/resume/reversal, calibration and loss.
+class EstimateTestGate extends MotionTestGate {
+    public int $clock=1800000000000;
+    protected function EstimateNowMs(): int {return $this->clock;}
+    public function advance(int $ms): void {$this->clock+=$ms;}
+}
+resetHardware();
+$GLOBALS['simLCNModules']=[14386,22849,30888];
+$GLOBALS['simLCNParents']=[36019=>14386,41452=>14386,53400=>14386,13220=>22849,21923=>22849,23120=>22849,11571=>22849,28550=>22849,17585=>22849,35739=>30888,30888=>37682,37682=>0];
+mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);mkVar(21923,VARIABLETYPE_BOOLEAN,true,false);
+mkVar(36019,VARIABLETYPE_BOOLEAN,false,false);mkVar(41452,VARIABLETYPE_BOOLEAN,false,false);mkVar(53400,VARIABLETYPE_BOOLEAN,true,false);
+mkVar(35739,VARIABLETYPE_STRING,'034002',false);
+$est=new EstimateTestGate();$est->InstanceID=15957;$est->Create();$est->props['EnableControl']=true;$est->ApplyChanges();
+check($est->props['TravelOpenSeconds']===39 && $est->props['TravelCloseSeconds']===40,'Reference times prefilled 39/40');
+check($est->values['PositionPercent']===100,'Closed calibration 100');
+$est->feedback(true,false);$est->event(36019);
+check($est->attrs['EstimateRemaining']===39,'Opening ETA immediately 39');
+$GLOBALS['simVars'][21923]['value']=false;
+for($i=0;$i<13;$i++) {$est->advance(1000);$est->Monitor();}
+check($est->values['PositionPercent']===67 && $est->attrs['EstimateRemaining']===26,'Opening after 13 s 67% and 26s');
+$est->feedback(false,false);$est->event(36019);
+$est->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$est->Monitor();
+for($i=0;$i<5;$i++) {$est->advance(1000);$est->Monitor();}
+check($est->values['PositionPercent']===67&&$est->attrs['EstimateRemaining']===-1,'Stop freezes position and clears ETA');
+$est->feedback(false,true);$est->event(41452);
+check($est->attrs['EstimateRemaining']===14,'Reversal uses closing reference, rounded upward');
+for($i=0;$i<4;$i++) {$est->advance(1000);$est->Monitor();}
+check($est->values['PositionPercent']===77&&$est->attrs['EstimateRemaining']===10,'Closing advances from stopped position');
+$est->feedback(true,false);$est->event(36019);
+check($est->values['PositionPercent']===77&&$est->attrs['EstimateRemaining']===30,'Direct direction reversal preserves position');
+for($i=0;$i<31;$i++) {$est->advance(1000);$est->Monitor();}
+check($est->values['PositionPercent']===1&&$est->attrs['EstimateRemaining']===0,'Estimated endpoint never claims 0 without switch');
+$est->feedback(false,false);$GLOBALS['simVars'][13220]['value']=true;$est->event(13220);
+check($est->values['PositionPercent']===0&&$est->attrs['EstimateRemaining']===-1,'Actual open end calibrates 0');
+$est->feedback(false,true);$est->event(41452);$GLOBALS['simVars'][13220]['value']=false;
+for($i=0;$i<20;$i++) {$est->advance(1000);$est->Monitor();}
+check($est->values['PositionPercent']===50&&$est->attrs['EstimateRemaining']===20,'Closing half');
+$est->feedback(false,true,false);$est->event(53400);
+check($est->values['PositionPercent']===-1&&$est->attrs['EstimateRemaining']===-1,'Offline invalidates estimate');
+$est->feedback(false,true,true);$est->event(53400);
+check($est->values['PositionPercent']===-1,'Intermediate recovery does not invent position');
+$est->feedback(false,false);$GLOBALS['simVars'][21923]['value']=true;$est->event(21923);
+check($est->values['PositionPercent']===100,'Actual closed end recovers estimate');
+$est->feedback(true,false);$est->event(36019);$GLOBALS['simVars'][21923]['value']=false;
+$est->advance(7000);$est->Monitor();
+check($est->values['PositionPercent']===-1,'Missed observation gap invalidates estimate');
+$est->feedback(false,false);$GLOBALS['simVars'][13220]['value']=true;$est->event(13220);
+check($est->values['PositionPercent']===0,'Recalibrate after timer gap');
+check(count($GLOBALS['simActions'])===0,'Position calculation never sends relay command');
+$est->props['TravelCloseSeconds']=50;$est->ApplyChanges();
+$est->feedback(false,true);$est->event(41452);
+check($est->attrs['EstimateRemaining']===50,'Edited travel time used immediately after calibration');
+$est->advance(1000);$est->Monitor();
+$est->feedback(false,false);$est->event(41452);$GLOBALS['simVars'][13220]['value']=false;
+$est->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$est->Monitor();
+$before=$est->values['PositionPercent'];$est->ApplyChanges();
+check($est->values['PositionPercent']===$before,'Reapply with same mapping and observed stop preserves estimate');
+
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

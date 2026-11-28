@@ -4,12 +4,14 @@ declare(strict_types=1);
 require_once __DIR__ . '/LCNTasten.php';
 require_once __DIR__ . '/LCNBridge.php';
 require_once __DIR__ . '/MotionFeedback.php';
+require_once __DIR__ . '/PositionEstimate.php';
 
 /** JVGaragentor: Fahrbefehle über Shelly Pro 3; Endlagen-/Laufzeit-Status. */
 class JVGaragentor extends IPSModuleStrict
 {
     use JVLCNBridgeTrait;
     use JVMotionFeedbackTrait;
+    use JVPositionEstimateTrait;
     private const OPENING = 'LÄUFT AUF';
     private const CLOSING = 'LÄUFT ZU';
     private const STOPPED = 'GESTOPPT';
@@ -24,6 +26,7 @@ class JVGaragentor extends IPSModuleStrict
         $this->RegisterPropertyBoolean('EnableControl', false);
         $this->LCNCreate();
         $this->MotionCreate();
+        $this->EstimateCreate();
         $this->RegisterPropertyInteger('RelayOpenVariable', 23120);
         $this->RegisterPropertyInteger('RelayCloseVariable', 11571);
         $this->RegisterPropertyInteger('RelayStopVariable', 28550);
@@ -60,6 +63,7 @@ class JVGaragentor extends IPSModuleStrict
         $this->SetTimerInterval('Monitor', 1000); // Local fallback / hold time / visualization only
         $this->LCNApplyChanges();
         $this->MotionApplyChanges();
+        $this->EstimateConfigure();
         $this->NameShellyVariables();
         $this->Monitor();
         $this->LCNScheduleCommission();
@@ -221,6 +225,8 @@ class JVGaragentor extends IPSModuleStrict
         }
         $open = $this->EndSignal('EndOpenVariable');
         $closed = $this->EndSignal('EndCloseVariable');
+        // No intermediate estimate in legacy mode without actual motion feedback.
+        $this->EstimateSample(($open===true || $closed===true) ? 0 : null,$open,$closed);
         if ($this->ReadPropertyBoolean('RequireEndStops') && ($open === null || $closed === null)) {
             // Ohne gültiges Eingangspaar niemals eine alte oder falsche Endlage anzeigen.
             if ($this->ReadAttributeInteger('MovementStarted') > 0) {
@@ -524,6 +530,9 @@ class JVGaragentor extends IPSModuleStrict
         }
         return [
             'position' => (string)$this->GetValue('Position'),
+            'positionPercent' => (int)$this->GetValue('PositionPercent'),
+            'positionRemaining' => $this->ReadAttributeInteger('EstimateRemaining'),
+            'positionEstimateUntil' => time()+4,
             'signal' => $signal,
             'effectUntil' => $deadline,
             'blinkPeriodMs' => min(4000, max(500, $this->ReadPropertyInteger('BlinkPeriodMs'))),

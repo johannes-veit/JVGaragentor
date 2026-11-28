@@ -13,6 +13,7 @@ jobs:
           php -l JVGaragentor/module.php
           php -l JVGaragentor/LCNBridge.php
           php -l JVGaragentor/MotionFeedback.php
+          php -l JVGaragentor/PositionEstimate.php
           php -l JVGaragentor/LCNTasten.php
           php -l JVAmpel/module.php
           php -l tests/simulate.php

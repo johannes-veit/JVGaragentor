@@ -133,6 +133,7 @@ trait JVMotionFeedbackTrait
         $motion = $this->MotionRead();
         $open = $this->EndSignal('EndOpenVariable');
         $closed = $this->EndSignal('EndCloseVariable');
+        $this->EstimateSample($motion,$open,$closed);
         if ($motion === null || !$this->IsOnline() || $open === null || $closed === null || ($open && $closed)) {
             $this->MotionClearZero();
             $this->WriteAttributeBoolean('MotionFeedbackOK', false);

@@ -1,3 +1,7 @@
+## v1.2.17 – Torposition und Restfahrzeit
+
+Neue Integer-Variable PositionPercent (Torposition (%) – Schließgrad), 0 = AUF, 100 = ZU, -1 = unbekannt. Referenzfahrzeiten AUF 39 s und ZU 40 s, beide im Formular änderbar. Lineare zeitbasierte Schätzung anhand tatsächlicher Fahrmeldungen, millisekundengenaue Integration; STOPP und Richtungswechsel erhalten die aktuelle Position, Endlagen kalibrieren, Ausfall/Beobachtungslücke invalidiert. Restzeit auf volle Sekunden aufgerundet, keine Schätzung als echte Endlage. Ergänzung nur im unteren Positionsfeld, keine Änderung der Tasten, Ampel oder WLED. Keine neue Konfiguration nötig. Die Schätzung berücksichtigt keine ungemessenen Sanftlauf-Geschwindigkeiten und ist keine Wegmessung.
+
 ## v1.2.16 – unverzögerter Farbwechsel
 
 Bei vorbereitetem Watchdog erhält jede neue Szene sofort einen parallelen POST an beide Controller, ohne Vorab-GET und mit transition/tt=0. Breathe startet mit heller Phase. Trifft ein Farbwechsel während einer laufenden Watchdog-Abfrage ein, bleibt er bis zur Verarbeitung vorgemerkt; der lokale 250-ms-Fallback verarbeitet den neuesten Zustand, ohne veraltete Szenen zu puffern. Zusätzliche Simulation für alle vier Farben und konkurrierende Ereignisse. Keine geänderte Konfiguration, keine neuen externen Abfragen. Reale WLAN-/LED-Latenz nicht gemessen.

@@ -13,8 +13,10 @@ const pos = {classList:{add(...x){x.forEach(y=>classes.add(y))}, remove(...x){x.
 const stateClasses = new Set();
 const state = {textContent:'',classList:{toggle(name,on){if(on)stateClasses.add(name);else stateClasses.delete(name)}}};
 const note = {textContent:''};
+const percent = {textContent:''};
+const eta = {textContent:''};
 const buttons = ['AUF','STOP','ZU'].map(cmd=>({disabled:true,dataset:{jvgCommand:cmd}, addEventListener(type,handler){this[type]=handler}}));
-const root = {querySelectorAll(){return buttons},querySelector(sel){return sel === '.jvg-position'?pos:sel === '.jvg-state'?state:sel === '.jvg-note'?note:null}};
+const root = {querySelectorAll(){return buttons},querySelector(sel){return sel === '.jvg-position'?pos:sel === '.jvg-state'?state:sel === '.jvg-note'?note:sel === '.jvg-percent'?percent:sel === '.jvg-eta'?eta:null}};
 const rootDoc={getElementById(id){return id==='jvg-root'?root:null}};
 let tick;
 const ctx = {
@@ -84,4 +86,25 @@ fakeTime+=2500;tick();
 check(classes.size===0,'Lost heartbeat removes stale motion color');
 push(3,'LÄUFT ZU',4);
 check(classes.has('jvg-red-flash'),'Actual closing uses renewable deadline as well');
+
+push(1,'LÄUFT AUF',4,{positionPercent:68,positionRemaining:27,positionEstimateUntil:Math.floor(fakeTime/1000)+4});
+check(percent.textContent==='ca. 68 %'&&eta.textContent==='Offen in 27 s','Opening position and ETA visible');
+push(3,'LÄUFT ZU',4,{positionPercent:68,positionRemaining:13,positionEstimateUntil:Math.floor(fakeTime/1000)+4});
+check(percent.textContent==='ca. 68 %'&&eta.textContent==='Geschlossen in 13 s','Closing ETA');
+push(0,'GESTOPPT',0,{positionPercent:68,positionRemaining:-1});
+check(percent.textContent==='ca. 68 %'&&eta.textContent==='','Stopped position frozen, ETA hidden');
+push(2,'AUF',10,{positionPercent:0,positionRemaining:-1});
+check(percent.textContent==='0 %'&&eta.textContent==='','Exact open end');
+push(4,'ZU',5,{positionPercent:100,positionRemaining:-1});
+check(percent.textContent==='100 %'&&eta.textContent==='','Exact closed end');
+push(1,'LÄUFT AUF',4,{positionPercent:1,positionRemaining:0,positionEstimateUntil:Math.floor(fakeTime/1000)+4});
+check(eta.textContent==='Endlage erwartet','Overdue estimate does not claim arrival');
+fakeTime+=4500;tick();
+check(percent.textContent==='– %'&&eta.textContent==='','Expired heartbeat hides moving estimate');
+push(0,'GESTOPPT',0,{positionPercent:-1,positionRemaining:-1});
+check(percent.textContent==='– %'&&eta.textContent==='','Unknown position neutral');
+push(0,'GESTOPPT',0,{positionPercent:50,online:false});
+check(percent.textContent==='– %','Offline does not display stale position');
+check(html.includes('jvg-footer')&&html.includes('font-size:clamp(12px,13cqw,32px)'),'Footer bounded by position column');
+
 console.log('PASS '+checks+' HTML/JS-Visualisierungstests');

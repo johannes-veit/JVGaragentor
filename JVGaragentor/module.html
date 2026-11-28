@@ -33,7 +33,12 @@
 #jvg-root .jvg-state {width:100%;min-width:0;flex:0 1 100%;white-space:pre-line;overflow-wrap:normal;word-break:normal;text-align:center;font-size:clamp(18px,22cqw,96px);line-height:1.12;padding:0 3%}
 #jvg-root .jvg-state.jvg-state-long {white-space:nowrap;font-size:min(15cqw,54px)}
 #jvg-root .jvg-state.jvg-state-moving {white-space:pre-line;font-size:min(20cqw,70px)}
-#jvg-root .jvg-note {position:absolute;bottom:3%;left:5%;right:5%;font-size:clamp(11px,4.2cqw,16px);line-height:1.25;color:#a22;max-height:17%;overflow:hidden;overflow-wrap:anywhere}
+#jvg-root .jvg-footer {position:absolute;bottom:3%;left:5%;right:5%;display:flex;flex-direction:column;align-items:stretch;gap:4px;max-height:36%;overflow:hidden;pointer-events:none}
+#jvg-root .jvg-note {font-size:clamp(10px,4.2cqw,16px);line-height:1.2;color:#a22;max-height:3.6em;overflow:hidden;overflow-wrap:anywhere}
+#jvg-root .jvg-note:empty {display:none}
+#jvg-root .jvg-percent {font-size:clamp(12px,13cqw,32px);font-weight:500;line-height:1.15;font-variant-numeric:tabular-nums;white-space:nowrap}
+#jvg-root .jvg-eta {font-size:clamp(10px,8cqw,20px);line-height:1.15;overflow-wrap:normal;word-break:normal;font-variant-numeric:tabular-nums}
+#jvg-root .jvg-eta:empty {display:none}
 @media(max-width:500px){#jvg-root {padding:3px}#jvg-root .jvg-grid {gap:7px}#jvg-root .jvg-label{font-size:clamp(13px,3.3vw,21px)}}
 </style>
 <div id="jvg-root">
@@ -55,7 +60,11 @@
     </div>
     <div class="jvg-card jvg-position"><div class="jvg-label">Position</div>
       <div class="jvg-state" role="status" aria-live="polite">GESTOPPT</div>
-      <div class="jvg-note"></div>
+      <div class="jvg-footer">
+        <div class="jvg-note"></div>
+        <div class="jvg-percent" aria-label="Schließgrad">– %</div>
+        <div class="jvg-eta"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -71,6 +80,8 @@
   let shownSignal = -1;
   const positionCard = root.querySelector('.jvg-position');
   const positionText = root.querySelector('.jvg-state');
+  const percentText = root.querySelector('.jvg-percent');
+  const etaText = root.querySelector('.jvg-eta');
   const effectClasses = ['jvg-yellow-flash','jvg-green','jvg-red-flash','jvg-red'];
   function renderSignal() {
     if (!latest) return;
@@ -84,6 +95,18 @@
       shownSignal = sig;
     }
   }
+  function renderEstimate() {
+    if (!latest) return;
+    const p = latest.positionPercent;
+    const remaining = latest.positionRemaining;
+    const moving = latest.position === 'LÄUFT AUF' || latest.position === 'LÄUFT ZU';
+    const fresh = !moving || Date.now() < Number(latest.positionEstimateUntil || 0)*1000;
+    const valid = latest.online === true && fresh && Number.isInteger(p) && p >= 0 && p <= 100;
+    percentText.textContent = valid ? ((p>0 && p<100 ? 'ca. ' : '') + p + ' %') : '– %';
+    etaText.textContent = valid && moving && Number.isInteger(remaining) && remaining >= 0
+      ? (remaining === 0 ? 'Endlage erwartet' : (latest.position === 'LÄUFT AUF' ? 'Offen in ' : 'Geschlossen in ') + remaining + ' s')
+      : '';
+  }
   function show(s) {
     if (!s || typeof s !== 'object') return;
     const valid = ['AUF','ZU','LÄUFT AUF','LÄUFT ZU','GESTOPPT'];
@@ -92,6 +115,7 @@
     const period = Number(s.blinkPeriodMs || 1600);
     positionCard.style.setProperty('--jvg-blink-ms', Math.min(4000, Math.max(500, period)) + 'ms');
     renderSignal();
+    renderEstimate();
     positionText.classList.toggle('jvg-state-long', pos === 'GESTOPPT');
     positionText.classList.toggle('jvg-state-moving', pos.startsWith('LÄUFT '));
     positionText.textContent = pos.replace('LÄUFT ', 'LÄUFT\n');
@@ -109,7 +133,7 @@
   }));
   show(initial);
   // Auch wenn die mobile Verbindung unterbrochen wird, endet die Darstellung rechtzeitig.
-  setInterval(renderSignal, 250);
+  setInterval(() => { renderSignal(); renderEstimate(); }, 250);
   // HTML-SDK erhält Status-Updates über diese Funktion.
   window.handleMessage = function (msg) {
     try { show(typeof msg === 'string' ? JSON.parse(msg) : msg); }

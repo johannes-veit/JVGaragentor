@@ -6,7 +6,7 @@
     },
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.2.16 – reale Fahrtrichtung; kurze Zwischenmeldungen stabilisiert, WLED-Watchdog verbessert."
+      "caption": "JV Garagentor v1.2.17 – reale Fahrtrichtung und berechneter Schließgrad mit Restfahrzeit."
     },
     {
       "type": "CheckBox",
@@ -95,6 +95,24 @@
     {
       "type": "Label",
       "caption": "ZEITEN FÜR TOR UND AMPEL: Alle vier folgenden Werte sind hier editierbar und bereits voreingestellt."
+    },
+    {
+      "type": "Label",
+      "caption": "Positionsschätzung: 0 % = AUF, 100 % = ZU. Lineare Berechnung anhand tatsächlicher Fahrmeldung; Endlagen kalibrieren. Nur Anzeige, keine Fahrsteuerung. -1 = Position nicht bekannt."
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "TravelOpenSeconds",
+      "caption": "Referenzfahrzeit AUF (Sekunden)",
+      "minimum": 5,
+      "maximum": 300
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "TravelCloseSeconds",
+      "caption": "Referenzfahrzeit ZU (Sekunden)",
+      "minimum": 5,
+      "maximum": 300
     },
     {
       "type": "NumberSpinner",

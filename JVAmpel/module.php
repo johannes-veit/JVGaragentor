@@ -18,6 +18,9 @@ class JVAmpel extends IPSModuleStrict
         $this->RegisterAttributeString('WatchdogSetup', '');
         $this->RegisterAttributeInteger('WatchdogLastSignal', -1);
         $this->RegisterAttributeInteger('WatchdogLastSent', 0);
+        $this->RegisterAttributeInteger('WatchdogLeaseAtMs', 0);
+        $this->RegisterAttributeInteger('WatchdogRetryCount', 0);
+        $this->RegisterAttributeString('AmpelTraceLast', '');
         $this->RegisterAttributeInteger('FastObservedSignal', -2);
         $this->RegisterAttributeBoolean('FastObservedOnline', false);
         $this->RegisterAttributeInteger('WatchdogStartMs', 0);
@@ -33,6 +36,7 @@ class JVAmpel extends IPSModuleStrict
         $this->RegisterAttributeInteger('BlockedGateSignal', -1);
         $this->RegisterAttributeInteger('SubscribedVariable', 0);
         $this->RegisterVariableString('AmpelStatus', 'Ampel-Status', [], 0);
+        $this->RegisterVariableString('AmpelDiagnose', 'Ampel-Diagnose (letzte Ereignisse)', [], 1);
         $this->RegisterTimer('Synchronize', 10000, 'JVGA_Sync($_IPS["TARGET"]);');
         $this->RegisterTimer('FastSignal', 0, 'JVGA_CheckSignal($_IPS["TARGET"]);');
     }
@@ -116,10 +120,13 @@ class JVAmpel extends IPSModuleStrict
     {
         parent::ApplyChanges();
         $this->RegisterVariableString('AmpelStatus', 'Ampel-Status', [], 0);
+        $this->RegisterVariableString('AmpelDiagnose', 'Ampel-Diagnose (letzte Ereignisse)', [], 1);
         $this->UpdateSignalSubscription();
         $this->WriteAttributeInteger('LastFrontSignal', -1);
         $this->WriteAttributeInteger('LastRearSignal', -1);
         $this->WriteAttributeInteger('WatchdogLastSignal', -1);
+        $this->WriteAttributeInteger('WatchdogLeaseAtMs', 0);
+        $this->WriteAttributeInteger('WatchdogRetryCount', 0);
         $this->SetTimerInterval('Synchronize', 10000);
         $this->SetTimerInterval('FastSignal', $this->ReadPropertyBoolean('EnableAmpel') ? 250 : 0);
         $this->WriteAttributeInteger('FastObservedSignal', -2);
@@ -162,6 +169,9 @@ class JVAmpel extends IPSModuleStrict
         $note = $validSource && $raw === $signal ? '' : 'Signalquelle ungültig; ';
         $online = $this->ReadPropertyInteger('GateOnlineVariable');
         $gateOnline = $this->IsVariable($online, VARIABLETYPE_BOOLEAN) && GetValueBoolean($online);
+        if ($raw!==$this->ReadAttributeInteger('FastObservedSignal') || $gateOnline!==$this->ReadAttributeBoolean('FastObservedOnline')) {
+            $this->AmpelTrace('Tor-Signal '.$this->ReadAttributeInteger('FastObservedSignal').' → '.$raw.' | Pro 3 '.($gateOnline?'online':'offline'));
+        }
         $this->WriteAttributeInteger('FastObservedSignal',$raw);
         $this->WriteAttributeBoolean('FastObservedOnline',$gateOnline);
         if (!$gateOnline || !$validSource || $raw !== $signal) {
@@ -269,6 +279,16 @@ class JVAmpel extends IPSModuleStrict
     {
         return $id > 0 && IPS_VariableExists($id) &&
             (int) IPS_GetVariable($id)['VariableType'] === $type;
+    }
+
+    private function AmpelTrace(string $event): void
+    {
+        if ($event===$this->ReadAttributeString('AmpelTraceLast')) return;
+        $this->WriteAttributeString('AmpelTraceLast',$event);
+        $old=explode("\n",(string)$this->GetValue('AmpelDiagnose'));
+        array_unshift($old,date('H:i:s').' '.$event);
+        $this->SetValue('AmpelDiagnose',implode("\n",array_slice(array_filter($old),0,16)));
+        $this->SendDebug('Ampel Diagnose',$event,0);
     }
 
     private function SetStatusText(string $text): void

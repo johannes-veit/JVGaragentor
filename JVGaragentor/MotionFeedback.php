@@ -23,6 +23,8 @@ trait JVMotionFeedbackTrait
         $this->RegisterAttributeInteger('MotionPendingUntil', 0);
         $this->RegisterAttributeString('MotionSubscriptions', '[]');
         $this->RegisterAttributeString('MotionMapping', '');
+        $this->RegisterAttributeInteger('MotionZeroSinceMs', 0);
+        $this->RegisterTimer('MotionSettle', 0, 'JVG_Monitor($_IPS["TARGET"]);');
     }
 
     private function MotionEnabled(): bool
@@ -78,6 +80,7 @@ trait JVMotionFeedbackTrait
         }
         foreach ($wanted as $id) $this->RegisterMessage($id, VM_UPDATE);
         $this->WriteAttributeString('MotionSubscriptions', json_encode($wanted) ?: '[]');
+        $this->MotionClearZero();
         $mapping = json_encode([$this->MotionEnabled(), $this->MotionIds()]) ?: '';
         if ($mapping !== $this->ReadAttributeString('MotionMapping')) {
             $this->WriteAttributeString('MotionMapping', $mapping);
@@ -117,12 +120,21 @@ trait JVMotionFeedbackTrait
         }
     }
 
+    private function MotionClearZero(): void
+    {
+        if ($this->ReadAttributeInteger('MotionZeroSinceMs')!==0) {
+            $this->WriteAttributeInteger('MotionZeroSinceMs',0);
+        }
+        $this->SetTimerInterval('MotionSettle',0);
+    }
+
     private function MotionMonitor(): void
     {
         $motion = $this->MotionRead();
         $open = $this->EndSignal('EndOpenVariable');
         $closed = $this->EndSignal('EndCloseVariable');
         if ($motion === null || !$this->IsOnline() || $open === null || $closed === null || ($open && $closed)) {
+            $this->MotionClearZero();
             $this->WriteAttributeBoolean('MotionFeedbackOK', false);
             $this->WriteAttributeBoolean('StateInitialized', false);
             $this->WriteAttributeInteger('MovementStarted', 0);
@@ -136,6 +148,8 @@ trait JVMotionFeedbackTrait
         $this->WriteAttributeBoolean('StateInitialized', true);
         $previous = (string)$this->GetValue('Position');
         if ($motion !== 0) {
+            if ($this->ReadAttributeInteger('MotionZeroSinceMs')>0) $this->SendDebug('Fahrtrichtung','Kurzer Aussetzer der Fahrmeldung beendet',0);
+            $this->MotionClearZero();
             $position = $motion === 1 ? self::OPENING : self::CLOSING;
             $this->WriteAttributeInteger('MotionPendingUntil', 0);
             if ($previous !== $position || $this->ReadAttributeInteger('MovementStarted') <= 0) {
@@ -153,6 +167,25 @@ trait JVMotionFeedbackTrait
             return;
         }
 
+        // Only a brief all-off transition between active motion and intermediate stop
+        // is filtered. Valid target end, offline or conflicting inputs are immediate.
+        // During the confirmation window no new driving command is allowed.
+        $targetReached=($previous===self::OPENING && $open) || ($previous===self::CLOSING && $closed);
+        if (!$initial && !$targetReached && in_array($previous,[self::OPENING,self::CLOSING],true)) {
+            $now=(int)floor(microtime(true)*1000);
+            $since=$this->ReadAttributeInteger('MotionZeroSinceMs');
+            if ($since<=0 || $now<$since) {
+                $since=$now;
+                $this->WriteAttributeInteger('MotionZeroSinceMs',$since);
+            }
+            if ($now-$since<200) {
+                $this->WriteAttributeBoolean('MotionFeedbackOK',false);
+                $this->SetTimerInterval('MotionSettle',200);
+                $this->Broadcast();
+                return;
+            }
+        }
+        $this->MotionClearZero();
         $this->WriteAttributeInteger('MovementStarted', 0);
         // Here actual standstill is confirmed, unlike the old time-only model.
         $this->WriteAttributeBoolean('NeedsStop', false);

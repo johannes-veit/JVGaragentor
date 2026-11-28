@@ -1,3 +1,7 @@
+## v1.2.14 – stabilere WLED-Fahrtanzeige
+
+Ein einmaliger HTTP-Lese-/Erneuerungsfehler wird nur bei unverändertem Torsignal und innerhalb des vorhandenen 5-s-Watchdogs einmal nachgeprüft, ohne Szene/Phase neu zu senden. Echte Abweichungen, Identitätsfehler und Quellenverlust bleiben sofortige Abschaltgründe. Playlist-Erneuerung ohne erzwungenes Weiterschalten; RGB und RGBW mit W=0 werden gleich behandelt. Die neue Variable Ampel-Diagnose hält die letzten 16 Signalwechsel, Starts und Fehlergründe fest. Kurze reine All-off-Zwischenmeldungen werden 200 ms bestätigt, ohne Fahrbefehle freizugeben; Endlage/Offline/Fehler sofort. Keine Änderungen an WLED-Farbpresets, Nachleuchtzeiten, Tor-IDs, LCN-Zuordnung oder HTML-Kachel. Ursache vor Ort erst durch Diagnose sicher bestimmbar.
+
 ## v1.2.13 – eindeutige Shelly-Variablennamen
 
 Einmalige kosmetische Umbenennung der 12 bestätigten Variablen von Shelly #22849 und #14386 durch Torinstanz #15957. IDs, Ident, Werte, Aktionen und Zuordnungen bleiben unverändert; abweichende Elternobjekte werden übersprungen, nachträglich manuell gesetzte Namen bleiben erhalten. Keine Änderung an der HTML-Kachel oder WLED-Logik.

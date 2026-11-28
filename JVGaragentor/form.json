@@ -6,7 +6,7 @@
     },
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.2.13 – Fahrtrichtung über Symcon-Variablen; eindeutige Namen der beiden Shelly-Gerätevariablen."
+      "caption": "JV Garagentor v1.2.14 – reale Fahrtrichtung; kurze Zwischenmeldungen stabilisiert, WLED-Watchdog verbessert."
     },
     {
       "type": "CheckBox",
@@ -471,6 +471,10 @@
     {
       "type": "Label",
       "caption": "LCN-PRO: Bei GT2 sind ab Werk eigene Peripherietasten konfiguriert. Die C-Tabelle (C1/C2) ist eine gesondert in LCN-PRO einstellbare Option; nur dann passt unsere Vorauswahl C1/C2. 033002=C1 KURZ, 033001=C1 LANG, 033000=C1 LOS. Tasten 1–8 je A/B/C/D-Tabelle; physische GT12-Tasten 9–12 liegen nicht als C9–C12 vor. Prüfe 'LCN letzte Tastenmeldung' ohne Torfahrten."
+    },
+    {
+      "type": "Label",
+      "caption": "Zwischenstopp: beide Fahrmeldungen AUS werden während einer Fahrt 200 ms nachgeprüft; währenddessen keine neue Fahrt erlaubt. Endlage, widersprüchliche Rückmeldung und Offline-Zustand werden unmittelbar verarbeitet."
     }
   ],
   "actions": []

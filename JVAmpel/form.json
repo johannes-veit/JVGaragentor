@@ -2,7 +2,7 @@
   "elements": [
     {
       "type": "Label",
-      "caption": "JV Ampel v1.5 – schneller Start mit heller Pulsphase, parallele Soll-Ist-Prüfung."
+      "caption": "JV Ampel v1.6 – unveränderte Szene bei laufender Fahrt, begrenzte Watchdog-Nachprüfung und Ereignisdiagnose."
     },
     {
       "type": "CheckBox",
@@ -77,6 +77,10 @@
     {
       "type": "Label",
       "caption": "Direkter Signalwechsel; lokaler 250-ms-Signalcheck ohne zusätzlichen WLED-Verkehr. Helle Startphase für Blink/Breathe/Fade. WLED-Kontrolle aktiv ca. 2 s, Ruhe 10 s."
+    },
+    {
+      "type": "Label",
+      "caption": "Ein einzelner Antwortausfall wird innerhalb des bestehenden 5-s-Watchdogs einmal nachgeprüft, ohne den Effekt neu zu starten. Echte Soll-Ist-Abweichung/Quellenverlust: AUS. Ampel-Diagnose protokolliert Signalwechsel und Abschaltgründe."
     }
   ],
   "actions": []

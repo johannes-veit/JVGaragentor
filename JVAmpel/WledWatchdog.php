@@ -85,6 +85,8 @@ trait JVWledWatchdogTrait
         }
         if ($req!==[]) $this->WledHttp($req);
         $this->WriteAttributeInteger('WatchdogLastSignal',-1);
+        $this->WriteAttributeInteger('WatchdogLeaseAtMs',0);
+        $this->WriteAttributeInteger('WatchdogRetryCount',0);
     }
 
     private function WdSlot(array $presets,string $name,array $exclude=[]): int
@@ -136,18 +138,60 @@ trait JVWledWatchdogTrait
         return ['on'=>true,'bri'=>$bri,'seg'=>[$bodySeg]];
     }
 
-    private function WdMatches(array $state,array $scene): bool
+    /** Return a precise mismatch reason. RGB and RGBW with W=0 are equivalent. */
+    private function WdMismatch(array $state,array $scene): string
     {
-        if (($state['on']??false)!==true || ($state['bri']??-1)!==$scene['bri'] ||
-            ($state['nl']['on']??true)!==false || ($state['pl']??-1)<0 ||
-            ($state['udpn']['send']??true)!==false || ($state['udpn']['rgrp']??-1)!==0 ||
-            ($state['udpn']['sgrp']??-1)!==0) return false;
+        if (($state['on']??false)!==true) return 'Ein/Aus';
+        if (($state['bri']??-1)!==$scene['bri']) return 'Helligkeit';
+        if (($state['nl']['on']??true)!==false) return 'Nightlight';
+        if (($state['pl']??-1)<0) return 'Watchdog-Playlist';
+        if (($state['udpn']['send']??true)!==false || ($state['udpn']['rgrp']??-1)!==0 ||
+            ($state['udpn']['sgrp']??-1)!==0) return 'UDP-Sync';
         $actual=$state['seg'][0]??null;
-        if (!is_array($actual)||count($state['seg'])!==1) return false;
+        if (!is_array($actual)||count($state['seg'])!==1) return 'Segment';
         foreach ($scene['seg'][0] as $k=>$v) {
-            if (!array_key_exists($k,$actual)||$actual[$k]!==$v) return false;
+            if (!array_key_exists($k,$actual)) return 'Segment '.$k.' fehlt';
+            $got=$actual[$k];
+            if ($k==='col' && is_array($got) && is_array($v)) {
+                $normalize=static function(array $colors): array {
+                    return array_map(static function($color) {
+                        if (is_array($color) && count($color)===3) $color[]=0;
+                        return $color;
+                    },$colors);
+                };
+                if ($normalize($got)===$normalize($v)) continue;
+            }
+            if ($got!==$v) return 'Segment '.$k;
         }
+        return '';
+    }
+
+    private function WdNowMs(): int
+    {
+        return (int)floor(microtime(true)*1000);
+    }
+
+    /** At most one read/renewal retry inside the already granted local lease.
+     * No blind renewal, no grace on a wrong scene, identity or source change.
+     */
+    private function WdRetry(int $source,int $raw,int $signal,string $reason): bool
+    {
+        $age=$this->WdNowMs()-$this->ReadAttributeInteger('WatchdogLeaseAtMs');
+        if ($signal<=0 || $this->ReadAttributeInteger('WatchdogLastSignal')!==$signal ||
+            $this->ReadAttributeInteger('WatchdogRetryCount')!==0 || $age<0 || $age>3500 ||
+            !$this->WdCurrent($source,$raw)) return false;
+        $this->WriteAttributeInteger('WatchdogRetryCount',1);
+        $this->SetTimerInterval('Synchronize',250);
+        $this->AmpelTrace('Signal '.$signal.' – '.$reason.'; einmalige Nachprüfung ohne Effekt-Neustart');
+        $this->SetStatusText('Signal '.$signal.' – '.$reason.'; Nachprüfung, Zustand momentan nicht vollständig bestätigt');
         return true;
+    }
+
+    private function WdLeaseAccepted(int $startedMs): void
+    {
+        $this->WriteAttributeInteger('WatchdogLeaseAtMs',$startedMs);
+        $this->WriteAttributeInteger('WatchdogLastSent',time());
+        $this->WriteAttributeInteger('WatchdogRetryCount',0);
     }
 
     private function WdPrepare(array $docs): ?array
@@ -206,11 +250,11 @@ trait JVWledWatchdogTrait
     }
 
     /** A local playlist starts immediately, holds without resetting the effect, then applies OFF. */
-    private function WdLease(array $s): array
+    private function WdLease(array $s, bool $start = false): array
     {
         return ['udpn'=>self::WD_UDP,'nl'=>['on'=>false],
             'playlist'=>['ps'=>[$s['hold']],'dur'=>[50],'transition'=>[0],'repeat'=>1,'end'=>$s['off'],'r'=>false],
-            'np'=>true];
+            'np'=>$start];
     }
 
     /**
@@ -258,10 +302,12 @@ trait JVWledWatchdogTrait
                 $phaseBody=$phase===null?[]:['tb'=>$phase];
                 $req=[];
                 foreach (self::WD_DEVICES as $side=>$device) {
-                    $req[$side]=['path'=>'/json/state','body'=>$scene+['transition'=>0,'tt'=>0]+$phaseBody+$this->WdLease($setup[$side])];
+                    $req[$side]=['path'=>'/json/state','body'=>$scene+['transition'=>0,'tt'=>0]+$phaseBody+$this->WdLease($setup[$side],true)];
                 }
+                $leaseStarted=$this->WdNowMs();
                 $res=$this->WledHttp($req);
                 if (($res['front']['success']??false)!==true||($res['rear']['success']??false)!==true||!$this->WdCurrent($source,$raw)) {
+                    $this->AmpelTrace('Signal '.$signal.' – Start nicht bestätigt oder Quelle gewechselt; AUS');
                     $this->WdOff([], $setup);
                     $this->WriteAttributeString('WatchdogSetup','');
                     $this->SetStatusText($note.'Signal '.$signal.' – Start nicht beidseitig bestätigt; AUS angefordert');
@@ -278,13 +324,27 @@ trait JVWledWatchdogTrait
                 $ms=(int)round((microtime(true)-$started)*1000);
                 $this->WriteAttributeInteger('WatchdogStartMs',$ms);
                 $this->WriteAttributeInteger('WatchdogLastSignal',$signal);
-                $this->WriteAttributeInteger('WatchdogLastSent',time());
+                $this->WdLeaseAccepted($leaseStarted);
+                $this->AmpelTrace('WLED-Szene '.$signal.' gestartet (vorher '.$last.')');
                 $this->SetStatusText($note.'Signal '.$signal.' – vorne/hinten angefordert ('.$ms.' ms API), Prüfung folgt');
                 $this->SetTimerInterval('Synchronize',250);
                 return;
             }
             $docs=$this->WdBoth('/json/si');
             if (!$this->WdIdentified('front',$docs['front']??null)||!$this->WdIdentified('rear',$docs['rear']??null)) {
+                $missing=[]; $onlyTimeout=true;
+                $expected=$setup['scenes'][$signal]??null;
+                foreach (self::WD_DEVICES as $side=>$device) {
+                    $doc=$docs[$side]??null;
+                    if ($doc===null) { $missing[]=$side; continue; }
+                    if (!$this->WdIdentified($side,$doc) || !is_array($expected) ||
+                        $this->WdMismatch($doc['state'],$expected)!=='' ||
+                        ($setup[$side]['pmt']??null)!==($doc['info']['fs']['pmt']??null) ||
+                        ($setup[$side]['off']??0)!==($doc['info']['leds']['bootps']??-1)) $onlyTimeout=false;
+                }
+                $reason='WLED-Abfrage '.implode('/',$missing).' ohne Antwort';
+                if ($onlyTimeout && $missing!==[] && $this->WdRetry($source,$raw,$signal,$reason)) return;
+                $this->AmpelTrace('Signal '.$signal.' – WLED-Verbindung/Identität gestört; AUS ('.implode('/',$missing).')');
                 $this->WdOff($docs,$setup);
                 $this->WriteAttributeString('WatchdogSetup','');
                 $this->SetStatusText($note.'Signal '.$signal.' – Verbindung/Identität gestört: vorne '.
@@ -298,6 +358,7 @@ trait JVWledWatchdogTrait
                     ($docs[$side]['info']['leds']['bootps']??-1)!==($setup[$side]['off']??0)) $changed=true;
             }
             if ($changed||!isset($setup['scenes'])) {
+                $this->AmpelTrace('Watchdog-Konfiguration/Presets neu prüfen; AUS');
                 $this->WdOff($docs);
                 $new=$this->WdPrepare($docs);
                 if ($new===null) {
@@ -325,29 +386,35 @@ trait JVWledWatchdogTrait
             }
             $scene=$setup['scenes'][$signal]??null;
             if (!is_array($scene)) { $this->WdOff($docs); $this->SetStatusText('Ampel AUS – Szene fehlt'); return; }
-            $front=$this->WdMatches($docs['front']['state'],$scene);
-            $rear=$this->WdMatches($docs['rear']['state'],$scene);
-            if (!$front||!$rear) {
+            $front=$this->WdMismatch($docs['front']['state'],$scene);
+            $rear=$this->WdMismatch($docs['rear']['state'],$scene);
+            if ($front!==''||$rear!=='') {
                 // No renewal of a divergent display. Switch both off; next tick may start fresh.
+                $reason='Signal '.$signal.' – Soll/Ist vorne '.($front===''?'OK':$front).' / hinten '.($rear===''?'OK':$rear).' – beide AUS';
+                $this->AmpelTrace($reason);
                 $this->WdOff($docs);
-                $this->SetStatusText('Signal '.$signal.' – Synchronisationsfehler: vorne '.($front?'OK':'abweichend').
-                    ' / hinten '.($rear?'OK':'abweichend').' – beide AUS angefordert');
+                $this->SetStatusText($reason.' angefordert');
                 return;
             }
-            if (time()-$this->ReadAttributeInteger('WatchdogLastSent')>=1) {
+            if ($this->ReadAttributeInteger('WatchdogRetryCount')>0 || time()-$this->ReadAttributeInteger('WatchdogLastSent')>=1) {
                 $req=[];
                 foreach (self::WD_DEVICES as $side=>$device) $req[$side]=['path'=>'/json/state','body'=>$this->WdLease($setup[$side])];
                 if (!$this->WdCurrent($source,$raw)) { $this->WdOff($docs); return; }
+                $leaseStarted=$this->WdNowMs();
                 $res=$this->WledHttp($req);
                 if (($res['front']['success']??false)!==true||($res['rear']['success']??false)!==true) {
+                    if ($this->WdRetry($source,$raw,$signal,'Watchdog-Erneuerung ohne Bestätigung')) return;
+                    $this->AmpelTrace('Signal '.$signal.' – Watchdog-Erneuerung fehlgeschlagen; AUS');
                     $this->WdOff($docs);
                     $this->SetStatusText('Signal '.$signal.' – Watchdog-Erneuerung fehlgeschlagen; AUS angefordert');
                     return;
                 }
-                $this->WriteAttributeInteger('WatchdogLastSent',time());
+                if (!$this->WdCurrent($source,$raw)) { $this->WdOff($docs); return; }
+                $this->WdLeaseAccepted($leaseStarted);
             }
             $this->SetStatusText('Signal '.$signal.' – vorne/hinten synchron (Farbe, Effekt, Helligkeit, Watchdog) | Start-API '.$this->ReadAttributeInteger('WatchdogStartMs').' ms');
         } catch (Throwable $e) {
+            $this->AmpelTrace('Watchdog-Ausnahme: '.$e->getMessage());
             $this->WdOff([],is_array($setup??null)?$setup:[]);
             $this->WriteAttributeString('WatchdogSetup','');
             $this->SetStatusText('Ampel nicht bestätigt – '.$e->getMessage());

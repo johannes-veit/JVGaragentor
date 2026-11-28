@@ -573,7 +573,7 @@ check($realGate->values['Position'] === 'ZU' && $realGate->values['Signal'] === 
     'Wiederhergestellte Zuordnung zeigt bestätigte Endlage ohne Schein-Nachleuchten');
 // JSON-Watchdog: emulate WLED API (not actual firmware or LED timing).
 class WdTestAmpel extends JVAmpel {
-    public array $docs=[], $presets=[], $requests=[];
+    public array $docs=[], $presets=[], $requests=[], $dropReads=[], $dropRenewals=[];
     public function initWd(): void {
         foreach (['front'=>'8c8c290df2ec','rear'=>'007007c90d6c'] as $side=>$mac) {
             $this->docs[$side]=['info'=>['ver'=>'0.15.0-b7','mac'=>$mac,'leds'=>['count'=>1,'bootps'=>0],'fs'=>['pmt'=>1]],'state'=>['on'=>false,'bri'=>255,'pl'=>-1,'nl'=>['on'=>false],'udpn'=>['send'=>false,'sgrp'=>0,'rgrp'=>0],'seg'=>[]]];
@@ -587,9 +587,10 @@ class WdTestAmpel extends JVAmpel {
         $this->requests[]=$requests; $r=[];
         foreach ($requests as $side=>$req) {
             if (!isset($this->docs[$side])) { $r[$side]=null; continue; }
-            if ($req['path']==='/json/si') { $r[$side]=$this->docs[$side]; continue; }
+            if ($req['path']==='/json/si') { if (($this->dropReads[$side]??0)>0) { $this->dropReads[$side]--; $r[$side]=null; } else $r[$side]=$this->docs[$side]; continue; }
             if ($req['path']==='/presets.json') { $r[$side]=$this->presets[$side]; continue; }
             $b=$req['body']; $s=&$this->docs[$side]['state'];
+            if (isset($b['playlist']) && !isset($b['seg']) && ($b['playlist']['ps']??[])!==[] && ($this->dropRenewals[$side]??0)>0) { $this->dropRenewals[$side]--; $r[$side]=null; unset($s); continue; }
             if (isset($b['psave'])) {
                 $id=$b['psave']; $save=$b; unset($save['psave'],$save['o'],$save['bootps']);
                 $this->presets[$side][$id]=$save; $this->docs[$side]['info']['fs']['pmt']++;
@@ -741,6 +742,8 @@ check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[2855
 check($m->values['Signal']===1,'STOP command not mistaken for actual standstill');
 $GLOBALS['simVars'][28550]['value']=true;
 $m->feedback(false,false);$m->event(36019);
+check($m->values['Signal']===1 && !$m->attrs['MotionFeedbackOK'],'Short all-off transition retains moving indication but blocks driving');
+$m->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$m->Monitor();
 check($m->values['Position']==='GESTOPPT' && $m->values['Signal']===0,'Actual intermediate stop');
 $m->attrs['LCNLastDispatch']='{}';
 check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[11571,true],'C2 short at standstill sends close');
@@ -836,7 +839,7 @@ $GLOBALS['simVars'][53400]['value']=false;$m->event(53400);publishMotionSignal($
 check(!$motionAmpel->docs['front']['state']['on']&&!$motionAmpel->docs['rear']['state']['on'],'Feedback loss disables both WLED controllers');
 $m->feedback(true,false);$m->event(36019);publishMotionSignal($m,$motionAmpel);
 checkMotionScene($motionAmpel,[255,160,0,0],true,'Feedback recovered');
-$m->feedback(false,false);$m->event(36019);publishMotionSignal($m,$motionAmpel);
+$m->feedback(false,false);$m->event(36019);$m->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$m->Monitor();publishMotionSignal($m,$motionAmpel);
 check(!$motionAmpel->docs['front']['state']['on']&&!$motionAmpel->docs['rear']['state']['on'],'Confirmed intermediate stop disables both WLED');
 
 
@@ -886,7 +889,7 @@ check(!$upgrade->RelayMigrationReady() && count($GLOBALS['simActions'])===0,'Aft
 check($upgrade->Command('AUF') && end($GLOBALS['simActions'])===[23120,true],'New O1 used');
 $GLOBALS['simVars'][23120]['value']=false;$GLOBALS['simVars'][36019]['value']=true;$upgrade->Monitor();
 check($upgrade->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[28550,false],'New O3 used for actual motion STOP');
-$GLOBALS['simVars'][28550]['value']=true;$GLOBALS['simVars'][36019]['value']=false;$GLOBALS['simVars'][21923]['value']=false;$upgrade->Monitor();$upgrade->attrs['LCNLastDispatch']='{}';
+$GLOBALS['simVars'][28550]['value']=true;$GLOBALS['simVars'][36019]['value']=false;$GLOBALS['simVars'][21923]['value']=false;$upgrade->Monitor();$upgrade->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$upgrade->Monitor();$upgrade->attrs['LCNLastDispatch']='{}';
 check($upgrade->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[11571,true],'New O2 used at standstill');
 
 
@@ -915,5 +918,61 @@ check(count($GLOBALS['simActions'])===0,'Rename sends no relay commands');
 check(count(json_decode($rename->attrs['ShellyNames113'],true))===12,'All successful renames recorded');
 IPS_SetName(23120,'Mein manueller Name');$rename->ApplyChanges();
 check(IPS_GetName(23120)==='Mein manueller Name','Later manual name stays unchanged');
+
+
+// Watchdog regression: yellow keeps its phase on isolated read/renewal loss.
+// The existing 5s lease remains unchanged; no scene or OFF command on retry.
+resetHardware();mkVar(80004,VARIABLETYPE_INTEGER,0,false);
+$stable=new WdTestAmpel();$stable->Create();$stable->initWd();
+$stable->props['SignalVariable']=80004;$stable->props['EnableAmpel']=true;
+$stable->ApplyChanges();$stable->Sync();
+$GLOBALS['simVars'][80004]['value']=1;$stable->MessageSink(time(),80004,VM_UPDATE,[]);
+$stable->Sync();$stable->requests=[];$stable->dropReads['front']=1;
+$stable->Sync();
+check($stable->attrs['WatchdogRetryCount']===1 && $stable->attrs['WatchdogLastSignal']===1,'Isolated GET timeout does not restart yellow');
+check(count($stable->requests)===1 && $stable->docs['front']['state']['on'] && $stable->docs['rear']['state']['on'],'Read timeout has no POST/OFF');
+$stable->requests=[];$stable->Sync();
+check($stable->attrs['WatchdogRetryCount']===0 && count($stable->requests)===2,'Verified retry renews lease');
+foreach($stable->requests[1] as $req) check(!isset($req['body']['seg'],$req['body']['tb']) && !array_key_exists('seg',$req['body']) && !array_key_exists('tb',$req['body']) && $req['body']['np']===false,'Renewal has no scene or phase reset');
+$stable->attrs['WatchdogLastSent']=time()-2;$stable->dropRenewals['rear']=1;$stable->requests=[];$stable->Sync();
+check($stable->attrs['WatchdogRetryCount']===1 && $stable->docs['front']['state']['on'] && $stable->docs['rear']['state']['on'],'Single lease ACK failure does not force both off');
+$stable->Sync();check($stable->attrs['WatchdogRetryCount']===0,'Renewal retried successfully');
+$stable->dropReads['front']=2;$stable->Sync();$stable->Sync();
+check(!$stable->docs['front']['state']['on']&&!$stable->docs['rear']['state']['on'],'Second unanswered read fails dark');
+check(str_contains($stable->values['AmpelDiagnose'],'Verbindung/Identität gestört'),'Failure retained in diagnostic history');
+$stable->Sync();$stable->Sync();$stable->Sync();
+check($stable->docs['front']['state']['on']&&$stable->docs['rear']['state']['on'],'Recovery after verified reinitialization');
+$stable->docs['front']['state']['seg'][0]['col'][0]=[255,160,0];
+$stable->Sync();check($stable->docs['front']['state']['on'],'Equivalent RGB and RGBW zero are not mismatch');
+$stable->docs['front']['state']['seg'][0]['col'][0]=[255,0,0,0];$stable->Sync();
+check(!$stable->docs['front']['state']['on']&&!$stable->docs['rear']['state']['on'],'Real wrong color still fails dark immediately');
+check(str_contains($stable->values['AmpelDiagnose'],'Segment col'),'Exact discrepancy logged');
+$stable->Sync();$stable->Sync();
+$stable->dropReads['rear']=1;$stable->attrs['WatchdogLeaseAtMs']=(int)(microtime(true)*1000)-4000;$stable->Sync();
+check(!$stable->docs['front']['state']['on'],'No retry outside remaining lease budget');
+$stable->Sync();$stable->Sync();$stable->Sync();
+$stable->dropReads['front']=1;$GLOBALS['simVars'][80004]['value']=0;$stable->Sync();
+check(!$stable->docs['front']['state']['on']&&!$stable->docs['rear']['state']['on'],'Actual source OFF never delayed by timeout grace');
+// Source-side brief all-off dip, no synthetic new command, no wrong color.
+resetHardware();
+$GLOBALS['simLCNModules']=[14386,22849,30888];
+$GLOBALS['simLCNParents']=[36019=>14386,41452=>14386,53400=>14386,13220=>22849,21923=>22849,23120=>22849,11571=>22849,28550=>22849,17585=>22849,35739=>30888,30888=>37682,37682=>0];
+mkVar(13220,VARIABLETYPE_BOOLEAN,false,false);mkVar(21923,VARIABLETYPE_BOOLEAN,false,false);
+mkVar(36019,VARIABLETYPE_BOOLEAN,true,false);mkVar(41452,VARIABLETYPE_BOOLEAN,false,false);mkVar(53400,VARIABLETYPE_BOOLEAN,true,false);
+mkVar(35739,VARIABLETYPE_STRING,'034002',false);
+$dip=new MotionTestGate();$dip->InstanceID=15957;$dip->Create();$dip->props['EnableControl']=true;$dip->props['LCNGarageEnabled']=true;$dip->ApplyChanges();
+$dip->feedback(false,false);$dip->event(36019);
+check($dip->values['Signal']===1 && !$dip->attrs['MotionFeedbackOK'],'Transient all-off cannot send close');
+check(!$dip->Command('ZU')&&count($GLOBALS['simActions'])===0,'During confirmation driving is blocked');
+$dip->feedback(true,false);$dip->event(36019);
+check($dip->values['Signal']===1&&$dip->attrs['MotionFeedbackOK']&&$dip->attrs['MotionZeroSinceMs']===0,'Short interruption recovered without signal restart');
+$dip->feedback(false,false);$dip->event(36019);
+check($dip->ProcessLCNInput(35739,'034002')&&end($GLOBALS['simActions'])===[28550,false],'GT2 short during ambiguous stop sends STOP');
+$dip->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$dip->Monitor();
+check($dip->values['Signal']===0,'Confirmed intermediate stop switches off');
+$dip->feedback(true,false);$dip->event(36019);$dip->feedback(false,false);$GLOBALS['simVars'][13220]['value']=true;$dip->event(13220);
+check($dip->values['Signal']===2,'Target end without confirmation delay');
+$GLOBALS['simVars'][13220]['value']=false;$dip->feedback(true,false);$dip->event(36019);$dip->feedback(false,false,false);$dip->event(53400);
+check($dip->values['Signal']===0&&!$dip->attrs['MotionFeedbackOK'],'Offline immediate, no debounce');
 
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

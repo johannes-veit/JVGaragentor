@@ -953,6 +953,22 @@ check(!$stable->docs['front']['state']['on'],'No retry outside remaining lease b
 $stable->Sync();$stable->Sync();$stable->Sync();
 $stable->dropReads['front']=1;$GLOBALS['simVars'][80004]['value']=0;$stable->Sync();
 check(!$stable->docs['front']['state']['on']&&!$stable->docs['rear']['state']['on'],'Actual source OFF never delayed by timeout grace');
+// Same fault scenario for red: unchanged signal and renewal must not replay its scene.
+resetHardware();mkVar(80004,VARIABLETYPE_INTEGER,0,false);
+$red=new WdTestAmpel();$red->Create();$red->initWd();
+$red->props['SignalVariable']=80004;$red->props['EnableAmpel']=true;
+$red->ApplyChanges();$red->Sync();
+$GLOBALS['simVars'][80004]['value']=3;$red->MessageSink(time(),80004,VM_UPDATE,[]);
+$red->Sync();$red->requests=[];
+$red->MessageSink(time(),80004,VM_UPDATE,[]);
+foreach($red->requests as $batch) foreach($batch as $req)
+    check(!isset($req['body']['seg'])&&!isset($req['body']['tb'])&&($req['body']['on']??true)!==false,'Repeated red source event never restarts scene');
+$red->requests=[];$red->dropReads['rear']=1;$red->Sync();
+check(count($red->requests)===1&&$red->attrs['WatchdogLastSignal']===3&&$red->docs['front']['state']['on']&&$red->docs['rear']['state']['on'],'Single failed read keeps both red controllers lit');
+$red->requests=[];$red->Sync();
+check($red->attrs['WatchdogRetryCount']===0&&$red->attrs['WatchdogLastSignal']===3,'Red read recovers without scene restart');
+foreach($red->requests as $batch) foreach($batch as $req)
+    check(!isset($req['body']['seg'])&&!isset($req['body']['tb'])&&($req['body']['on']??true)!==false,'Red retry sends no scene or OFF');
 // Source-side brief all-off dip, no synthetic new command, no wrong color.
 resetHardware();
 $GLOBALS['simLCNModules']=[14386,22849,30888];

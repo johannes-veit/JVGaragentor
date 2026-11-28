@@ -1065,7 +1065,7 @@ $est=new EstimateTestGate();$est->InstanceID=15957;$est->Create();$est->props['E
 check($est->props['TravelOpenSeconds']===39 && $est->props['TravelCloseSeconds']===40,'Reference times prefilled 39/40');
 check($est->values['PositionPercent']===100,'Closed calibration 100');
 $est->feedback(true,false);$est->event(36019);
-check($est->attrs['EstimateRemaining']===39,'Opening ETA immediately 39');
+check($est->attrs['EstimateRemaining']===39 && $est->values['PositionPercent']===100,'Opening ETA immediately 39 and confirmed starting end 100');
 $GLOBALS['simVars'][21923]['value']=false;
 for($i=0;$i<13;$i++) {$est->advance(1000);$est->Monitor();}
 check($est->values['PositionPercent']===67 && $est->attrs['EstimateRemaining']===26,'Opening after 13 s 67% and 26s');
@@ -1081,8 +1081,10 @@ $est->feedback(true,false);$est->event(36019);
 check($est->values['PositionPercent']===77&&$est->attrs['EstimateRemaining']===30,'Direct direction reversal preserves position');
 for($i=0;$i<31;$i++) {$est->advance(1000);$est->Monitor();}
 check($est->values['PositionPercent']===1&&$est->attrs['EstimateRemaining']===0,'Estimated endpoint never claims 0 without switch');
-$est->feedback(false,false);$GLOBALS['simVars'][13220]['value']=true;$est->event(13220);
-check($est->values['PositionPercent']===0&&$est->attrs['EstimateRemaining']===-1,'Actual open end calibrates 0');
+$GLOBALS['simVars'][13220]['value']=true;$est->event(13220);
+check($est->values['PositionPercent']===0&&$est->attrs['EstimateRemaining']===-1,'Physical open end calibrates immediately, even before motion relay releases');
+$est->feedback(false,false);$est->event(36019);
+check($est->values['PositionPercent']===0&&$est->attrs['EstimateAnchor']===0,'Open end resets absolute anchor');
 $est->feedback(false,true);$est->event(41452);$GLOBALS['simVars'][13220]['value']=false;
 for($i=0;$i<20;$i++) {$est->advance(1000);$est->Monitor();}
 check($est->values['PositionPercent']===50&&$est->attrs['EstimateRemaining']===20,'Closing half');
@@ -1091,7 +1093,7 @@ check($est->values['PositionPercent']===-1&&$est->attrs['EstimateRemaining']===-
 $est->feedback(false,true,true);$est->event(53400);
 check($est->values['PositionPercent']===-1,'Intermediate recovery does not invent position');
 $est->feedback(false,false);$GLOBALS['simVars'][21923]['value']=true;$est->event(21923);
-check($est->values['PositionPercent']===100,'Actual closed end recovers estimate');
+check($est->values['PositionPercent']===100 && $est->attrs['EstimateAnchor']===100000,'Actual closed end recovers and resets absolute anchor');
 $est->feedback(true,false);$est->event(36019);$GLOBALS['simVars'][21923]['value']=false;
 $est->advance(7000);$est->Monitor();
 check($est->values['PositionPercent']===-1,'Missed observation gap invalidates estimate');

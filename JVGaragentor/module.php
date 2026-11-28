@@ -532,7 +532,7 @@ class JVGaragentor extends IPSModuleStrict
             'position' => (string)$this->GetValue('Position'),
             'positionPercent' => (int)$this->GetValue('PositionPercent'),
             'positionRemaining' => $this->ReadAttributeInteger('EstimateRemaining'),
-            'positionEstimateUntil' => time()+4,
+            'positionEstimateUntil' => in_array((string)$this->GetValue('Position'),[self::OPENING,self::CLOSING],true) ? time()+4 : 0,
             'signal' => $signal,
             'effectUntil' => $deadline,
             'blinkPeriodMs' => min(4000, max(500, $this->ReadPropertyInteger('BlinkPeriodMs'))),

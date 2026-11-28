@@ -86,8 +86,9 @@ trait JVPositionEstimateTrait
             $delta=(int)round(max(0,$now-$at)*100000/($this->EstimateTravelSeconds($old)*1000));
             $position=min(100000,max(0,$anchor+($old===1?-$delta:$delta)));
         }
-        // Physical end switches take precedence when motion has ceased.
-        if ($motion===0 && ($open||$closed)) {
+        // Physical target end switches take precedence even if the drive relay
+        // is still on for a short time. This is a new absolute calibration.
+        if (($motion===0 && ($open||$closed)) || ($motion===1 && $open) || ($motion===3 && $closed)) {
             $position=$open?0:100000;
             $this->EstimateSetAnchor($position,$now,0);
             $this->EstimatePublish($open?0:100,-1);
@@ -104,11 +105,13 @@ trait JVPositionEstimateTrait
             return;
         }
         // Never announce either exact end point without its physical confirmation.
-        $percent=min(99,max(1,(int)round($position/1000)));
+        $percent=$open?0:($closed?100:min(99,max(1,(int)round($position/1000))));
         $remaining=-1;
         if ($motion===1 || $motion===3) {
             $distance=$motion===1?$position:100000-$position;
-            $remaining=(int)ceil($distance*$this->EstimateTravelSeconds($motion)/100000);
+            // Half a fixed-point unit can otherwise round an exact whole second up.
+            $seconds=$this->EstimateTravelSeconds($motion);
+            $remaining=max(0,(int)ceil(($distance-0.5)*$seconds/100000));
         }
         $this->EstimatePublish($percent,$remaining);
     }

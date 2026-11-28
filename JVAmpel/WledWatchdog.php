@@ -289,8 +289,15 @@ trait JVWledWatchdogTrait
     {
         $lock='JVWledWatchdog'.$this->InstanceID;
         $useLock=function_exists('IPS_SemaphoreEnter')&&function_exists('IPS_SemaphoreLeave');
-        if ($useLock&&!IPS_SemaphoreEnter($lock,0)) { $this->SetTimerInterval('Synchronize',250); return; }
+        if ($useLock&&!IPS_SemaphoreEnter($lock,0)) {
+            // A newer signal may have arrived while the watchdog was busy.
+            // Keep the request pending even if the previous call changes its timer.
+            $this->WriteAttributeBoolean('WatchdogPending',true);
+            $this->SetTimerInterval('Synchronize',250);
+            return;
+        }
         try {
+            $this->WriteAttributeBoolean('WatchdogPending',false);
             $setup=json_decode($this->ReadAttributeString('WatchdogSetup'),true);
             if (!is_array($setup)) $setup=[];
             $last=$this->ReadAttributeInteger('WatchdogLastSignal');
@@ -431,6 +438,7 @@ trait JVWledWatchdogTrait
             $this->WriteAttributeString('WatchdogSetup','');
             $this->SetStatusText('Ampel nicht bestätigt – '.$e->getMessage());
         } finally {
+            if ($this->ReadAttributeBoolean('WatchdogPending')) $this->SetTimerInterval('Synchronize',250);
             if ($useLock) IPS_SemaphoreLeave($lock);
         }
     }

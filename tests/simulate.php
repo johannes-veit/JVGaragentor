@@ -18,6 +18,12 @@ $GLOBALS['simScriptRuns'] = [];
 function mkVar(int $id, int $type, mixed $value, bool $action = true): void {
     $GLOBALS['simVars'][$id] = ['type'=>$type,'value'=>$value,'action'=>$action];
 }
+$GLOBALS['simSemaphore']=[];
+function IPS_SemaphoreEnter(string $name,int $timeout): bool {
+    if (!empty($GLOBALS['simSemaphore'][$name])) return false;
+    $GLOBALS['simSemaphore'][$name]=true;return true;
+}
+function IPS_SemaphoreLeave(string $name): bool {unset($GLOBALS['simSemaphore'][$name]);return true;}
 function IPS_VariableExists(int $id): bool { return isset($GLOBALS['simVars'][$id]); }
 function IPS_GetName(int $id): string { return $GLOBALS['simVars'][$id]['name'] ?? 'Standardname'; }
 function IPS_SetName(int $id, string $name): bool {
@@ -1002,5 +1008,44 @@ $dip->feedback(true,false);$dip->event(36019);$dip->feedback(false,false);$GLOBA
 check($dip->values['Signal']===2,'Target end without confirmation delay');
 $GLOBALS['simVars'][13220]['value']=false;$dip->feedback(true,false);$dip->event(36019);$dip->feedback(false,false,false);$dip->event(53400);
 check($dip->values['Signal']===0&&!$dip->attrs['MotionFeedbackOK'],'Offline immediate, no debounce');
+
+
+// Fast path: all four colors are sent in the first parallel POST, no read or
+// transition delay, pulse phase is bright on cold start and direction change.
+resetHardware();mkVar(80004,VARIABLETYPE_INTEGER,0,false);
+$fast=new WdTestAmpel();$fast->Create();$fast->initWd();
+$fast->props['SignalVariable']=80004;$fast->props['EnableAmpel']=true;
+$fast->ApplyChanges();$fast->Sync();
+foreach ([1,2,3,4,1,3,2,4] as $signal) {
+    $fast->requests=[];$GLOBALS['simVars'][80004]['value']=$signal;
+    $fast->MessageSink(time(),80004,VM_UPDATE,[]);
+    $batch=$fast->requests[0]??[];
+    check(isset($batch['front'],$batch['rear']),'Both controllers receive immediate signal '.$signal);
+    foreach ($batch as $req) {
+        $body=$req['body']??[];
+        check($req['path']==='/json/state' && ($body['on']??false)===true &&
+            ($body['tt']??-1)===0 && ($body['transition']??-1)===0 &&
+            ($body['seg'][0]['col'][0]??[])===$fast->presets['front'][$signal]['seg'][0]['col'][0],
+            'First request contains correct color with zero transition '.$signal);
+        check(in_array($signal,[1,3],true)?($body['tb']??-1)===1008:!isset($body['tb']),
+            'Bright start only for pulsing scene '.$signal);
+    }
+    check($fast->attrs['WatchdogLastSignal']===$signal,'No timer wait for signal '.$signal);
+}
+// A new color must not be lost if a regular watchdog operation holds the lock.
+$lock='JVWledWatchdog'.$fast->InstanceID;
+$GLOBALS['simSemaphore'][$lock]=true;
+$fast->requests=[];$GLOBALS['simVars'][80004]['value']=1;
+$fast->MessageSink(time(),80004,VM_UPDATE,[]);
+check($fast->requests===[]&&$fast->attrs['WatchdogPending'],'Contended color change retained, not sent concurrently');
+$GLOBALS['simVars'][80004]['value']=3;
+$fast->MessageSink(time(),80004,VM_UPDATE,[]);
+unset($GLOBALS['simSemaphore'][$lock]);
+$fast->CheckSignal();
+check(!$fast->attrs['WatchdogPending']&&$fast->attrs['WatchdogLastSignal']===3 &&
+    ($fast->requests[0]['front']['body']['seg'][0]['col'][0]??[])===[255,0,0,0],
+    '250ms fallback dispatches newest pending color directly, not stale yellow');
+$fast->requests=[];$fast->CheckSignal();
+check($fast->requests===[],'No duplicate traffic once pending color is handled');
 
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";

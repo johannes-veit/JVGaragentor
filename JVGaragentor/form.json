@@ -6,7 +6,7 @@
     },
     {
       "type": "Label",
-      "caption": "JV Garagentor v1.2.15 – reale Fahrtrichtung; kurze Zwischenmeldungen stabilisiert, WLED-Watchdog verbessert."
+      "caption": "JV Garagentor v1.2.16 – reale Fahrtrichtung; kurze Zwischenmeldungen stabilisiert, WLED-Watchdog verbessert."
     },
     {
       "type": "CheckBox",

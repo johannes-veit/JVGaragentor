@@ -20,6 +20,7 @@ class JVAmpel extends IPSModuleStrict
         $this->RegisterAttributeInteger('WatchdogLastSent', 0);
         $this->RegisterAttributeInteger('WatchdogLeaseAtMs', 0);
         $this->RegisterAttributeInteger('WatchdogRetryCount', 0);
+        $this->RegisterAttributeBoolean('WatchdogPending', false);
         $this->RegisterAttributeString('AmpelTraceLast', '');
         $this->RegisterAttributeInteger('FastObservedSignal', -2);
         $this->RegisterAttributeBoolean('FastObservedOnline', false);
@@ -152,7 +153,8 @@ class JVAmpel extends IPSModuleStrict
         $onlineID=$this->ReadPropertyInteger('GateOnlineVariable');
         $online=$this->IsVariable($onlineID,VARIABLETYPE_BOOLEAN)&&GetValueBoolean($onlineID);
         if ($raw!==$this->ReadAttributeInteger('FastObservedSignal') ||
-            $online!==$this->ReadAttributeBoolean('FastObservedOnline')) $this->Sync();
+            $online!==$this->ReadAttributeBoolean('FastObservedOnline') ||
+            ($this->ReadPropertyBoolean('UseLocalWatchdog') && $this->ReadAttributeBoolean('WatchdogPending'))) $this->Sync();
     }
 
     public function Sync(): void

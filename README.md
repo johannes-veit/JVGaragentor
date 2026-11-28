@@ -1,3 +1,7 @@
+## v1.2.16 – unverzögerter Farbwechsel
+
+Bei vorbereitetem Watchdog erhält jede neue Szene sofort einen parallelen POST an beide Controller, ohne Vorab-GET und mit transition/tt=0. Breathe startet mit heller Phase. Trifft ein Farbwechsel während einer laufenden Watchdog-Abfrage ein, bleibt er bis zur Verarbeitung vorgemerkt; der lokale 250-ms-Fallback verarbeitet den neuesten Zustand, ohne veraltete Szenen zu puffern. Zusätzliche Simulation für alle vier Farben und konkurrierende Ereignisse. Keine geänderte Konfiguration, keine neuen externen Abfragen. Reale WLAN-/LED-Latenz nicht gemessen.
+
 ## v1.2.15 – Überwachungsaudit
 
 Identische Ampel-Signalereignisse lösen im Watchdog-Modus keinen HTTP-Verkehr aus. Bestehende Ereignisregistrierungen werden bei ApplyChanges wiederhergestellt. Nachprüfung nur bis 3 s seit letzter bestätigter Lease-Anforderung, verspätete Nachprüfung vor POST ab 4,2 s abgewiesen. Wiederholte All-off-Ereignisse starten den 200-ms-Bestätigungstimer nicht neu. Keine Eigenschaft, ID, Variable oder Visualisierungsdatei entfernt. Hardwareprüfung erforderlich.

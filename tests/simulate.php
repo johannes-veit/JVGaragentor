@@ -795,7 +795,7 @@ unset($GLOBALS['simVars'][36019]);$m->Monitor();
 check(!$m->attrs['MotionFeedbackOK'],'Missing variable is not standstill');
 mkVar(36019,VARIABLETYPE_BOOLEAN,false,false);
 $m->ApplyChanges();
-$m->feedback(false,false);$m->event(36019);$m->attrs['LCNLastDispatch']='{}';
+$m->feedback(false,false);$m->event(36019);$m->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$m->Monitor();$m->attrs['LCNLastDispatch']='{}';
 $GLOBALS['simVars'][28550]['value']=false;
 $before=count($GLOBALS['simActions']);
 check(!$m->Command('AUF') && count($GLOBALS['simActions'])===$before,'No drive while STOP contact open');

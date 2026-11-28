@@ -1,3 +1,7 @@
+## v1.2.15 – Überwachungsaudit
+
+Identische Ampel-Signalereignisse lösen im Watchdog-Modus keinen HTTP-Verkehr aus. Bestehende Ereignisregistrierungen werden bei ApplyChanges wiederhergestellt. Nachprüfung nur bis 3 s seit letzter bestätigter Lease-Anforderung, verspätete Nachprüfung vor POST ab 4,2 s abgewiesen. Wiederholte All-off-Ereignisse starten den 200-ms-Bestätigungstimer nicht neu. Keine Eigenschaft, ID, Variable oder Visualisierungsdatei entfernt. Hardwareprüfung erforderlich.
+
 ## v1.2.14 – stabilere WLED-Fahrtanzeige
 
 Ein einmaliger HTTP-Lese-/Erneuerungsfehler wird nur bei unverändertem Torsignal und innerhalb des vorhandenen 5-s-Watchdogs einmal nachgeprüft, ohne Szene/Phase neu zu senden. Echte Abweichungen, Identitätsfehler und Quellenverlust bleiben sofortige Abschaltgründe. Playlist-Erneuerung ohne erzwungenes Weiterschalten; RGB und RGBW mit W=0 werden gleich behandelt. Die neue Variable Ampel-Diagnose hält die letzten 16 Signalwechsel, Starts und Fehlergründe fest. Kurze reine All-off-Zwischenmeldungen werden 200 ms bestätigt, ohne Fahrbefehle freizugeben; Endlage/Offline/Fehler sofort. Keine Änderungen an WLED-Farbpresets, Nachleuchtzeiten, Tor-IDs, LCN-Zuordnung oder HTML-Kachel. Ursache vor Ort erst durch Diagnose sicher bestimmbar.

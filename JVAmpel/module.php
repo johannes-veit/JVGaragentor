@@ -86,11 +86,11 @@ class JVAmpel extends IPSModuleStrict
      * Erneute Suche im 10-Sekunden-Timer: Funktioniert auch, wenn die
      * Torinstanz erst nach der Ampelinstanz erstellt wird.
      */
-    private function UpdateSignalSubscription(): int
+    private function UpdateSignalSubscription(bool $restore = false): int
     {
         [$signalID, $note] = $this->FindSignal();
         $previous = $this->ReadAttributeInteger('SubscribedVariable');
-        if ($previous !== $signalID) {
+        if ($previous !== $signalID || $restore) {
             if ($previous > 0) {
                 $this->UnregisterMessage($previous, VM_UPDATE);
             }
@@ -121,7 +121,7 @@ class JVAmpel extends IPSModuleStrict
         parent::ApplyChanges();
         $this->RegisterVariableString('AmpelStatus', 'Ampel-Status', [], 0);
         $this->RegisterVariableString('AmpelDiagnose', 'Ampel-Diagnose (letzte Ereignisse)', [], 1);
-        $this->UpdateSignalSubscription();
+        $this->UpdateSignalSubscription(true);
         $this->WriteAttributeInteger('LastFrontSignal', -1);
         $this->WriteAttributeInteger('LastRearSignal', -1);
         $this->WriteAttributeInteger('WatchdogLastSignal', -1);
@@ -137,7 +137,9 @@ class JVAmpel extends IPSModuleStrict
     {
         if ($Message === VM_UPDATE && $SenderID > 0 &&
             $SenderID === $this->ReadAttributeInteger('SubscribedVariable')) {
-            $this->Sync();
+            // Duplicate updates in watchdog mode must not trigger extra WLED HTTP requests.
+            if ($this->ReadPropertyBoolean('UseLocalWatchdog')) $this->CheckSignal();
+            else $this->Sync();
         }
     }
 

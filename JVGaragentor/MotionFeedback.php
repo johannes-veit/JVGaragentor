@@ -177,10 +177,10 @@ trait JVMotionFeedbackTrait
             if ($since<=0 || $now<$since) {
                 $since=$now;
                 $this->WriteAttributeInteger('MotionZeroSinceMs',$since);
+                $this->SetTimerInterval('MotionSettle',200);
             }
             if ($now-$since<200) {
                 $this->WriteAttributeBoolean('MotionFeedbackOK',false);
-                $this->SetTimerInterval('MotionSettle',200);
                 $this->Broadcast();
                 return;
             }

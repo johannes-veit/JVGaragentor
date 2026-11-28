@@ -103,7 +103,8 @@ class IPSModuleStrict {
     public function GetValue(string $name): mixed {return $this->values[$name];}
     public function SetValue(string $name,mixed $v): void {$this->values[$name]=$v;}
     public function RegisterTimer(string $name,int $time,string $callback): void {}
-    public function SetTimerInterval(string $name,int $time): void {}
+    public array $timerChanges=[];
+    public function SetTimerInterval(string $name,int $time): void {$this->timerChanges[]=[$name,$time];}
     public function SetVisualizationType(int $type): void {}
     // Reale öffentliche Methode der IPSModuleStrict-Basisklasse. Schützt
     // gegen einen fatalen Klassenladefehler durch kollidierende Methodennamen.
@@ -961,6 +962,7 @@ $red->ApplyChanges();$red->Sync();
 $GLOBALS['simVars'][80004]['value']=3;$red->MessageSink(time(),80004,VM_UPDATE,[]);
 $red->Sync();$red->requests=[];
 $red->MessageSink(time(),80004,VM_UPDATE,[]);
+check($red->requests===[],'Duplicate signal update produces no WLED traffic');
 foreach($red->requests as $batch) foreach($batch as $req)
     check(!isset($req['body']['seg'])&&!isset($req['body']['tb'])&&($req['body']['on']??true)!==false,'Repeated red source event never restarts scene');
 $red->requests=[];$red->dropReads['rear']=1;$red->Sync();
@@ -969,6 +971,14 @@ $red->requests=[];$red->Sync();
 check($red->attrs['WatchdogRetryCount']===0&&$red->attrs['WatchdogLastSignal']===3,'Red read recovers without scene restart');
 foreach($red->requests as $batch) foreach($batch as $req)
     check(!isset($req['body']['seg'])&&!isset($req['body']['tb'])&&($req['body']['on']??true)!==false,'Red retry sends no scene or OFF');
+$red->messages=[];$red->ApplyChanges();
+check(($red->messages[80004]??0)===VM_UPDATE,'ApplyChanges restores existing amp event subscription');
+$red->Sync();$red->dropReads['rear']=1;$red->Sync();
+check($red->attrs['WatchdogRetryCount']===1,'Retry armed before delay');
+$red->attrs['WatchdogLeaseAtMs']=(int)(microtime(true)*1000)-4300;$red->requests=[];$red->Sync();
+check(!$red->docs['front']['state']['on']&&!$red->docs['rear']['state']['on'],'Late retry fails dark without extending expired budget');
+foreach($red->requests as $batch) foreach($batch as $req)
+    check(!isset($req['body']['playlist']) || $req['body']['playlist']['ps']===[],'Late retry never renews lease');
 // Source-side brief all-off dip, no synthetic new command, no wrong color.
 resetHardware();
 $GLOBALS['simLCNModules']=[14386,22849,30888];
@@ -978,6 +988,8 @@ mkVar(36019,VARIABLETYPE_BOOLEAN,true,false);mkVar(41452,VARIABLETYPE_BOOLEAN,fa
 mkVar(35739,VARIABLETYPE_STRING,'034002',false);
 $dip=new MotionTestGate();$dip->InstanceID=15957;$dip->Create();$dip->props['EnableControl']=true;$dip->props['LCNGarageEnabled']=true;$dip->ApplyChanges();
 $dip->feedback(false,false);$dip->event(36019);
+$dip->timerChanges=[];$dip->event(36019);
+check(!in_array(['MotionSettle',200],$dip->timerChanges,true),'Duplicate all-off does not restart settle timer');
 check($dip->values['Signal']===1 && !$dip->attrs['MotionFeedbackOK'],'Transient all-off cannot send close');
 check(!$dip->Command('ZU')&&count($GLOBALS['simActions'])===0,'During confirmation driving is blocked');
 $dip->feedback(true,false);$dip->event(36019);

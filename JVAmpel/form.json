@@ -2,7 +2,7 @@
   "elements": [
     {
       "type": "Label",
-      "caption": "JV Ampel v1.6 – unveränderte Szene bei laufender Fahrt, begrenzte Watchdog-Nachprüfung und Ereignisdiagnose."
+      "caption": "JV Ampel v1.7 – unveränderte Szene bei laufender Fahrt, begrenzte Watchdog-Nachprüfung und Ereignisdiagnose."
     },
     {
       "type": "CheckBox",

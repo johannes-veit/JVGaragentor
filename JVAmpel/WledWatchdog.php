@@ -178,7 +178,7 @@ trait JVWledWatchdogTrait
     {
         $age=$this->WdNowMs()-$this->ReadAttributeInteger('WatchdogLeaseAtMs');
         if ($signal<=0 || $this->ReadAttributeInteger('WatchdogLastSignal')!==$signal ||
-            $this->ReadAttributeInteger('WatchdogRetryCount')!==0 || $age<0 || $age>3500 ||
+            $this->ReadAttributeInteger('WatchdogRetryCount')!==0 || $age<0 || $age>3000 ||
             !$this->WdCurrent($source,$raw)) return false;
         $this->WriteAttributeInteger('WatchdogRetryCount',1);
         $this->SetTimerInterval('Synchronize',250);
@@ -279,7 +279,9 @@ trait JVWledWatchdogTrait
     private function WdCurrent(int $source,int $raw): bool
     {
         $online=$this->ReadPropertyInteger('GateOnlineVariable');
-        return $this->IsVariable($source,VARIABLETYPE_INTEGER)&&GetValueInteger($source)===$raw&&
+        return $this->ReadPropertyBoolean('EnableAmpel') && $this->ReadPropertyBoolean('UseLocalWatchdog') &&
+            $this->ReadAttributeInteger('SubscribedVariable')===$source &&
+            $this->IsVariable($source,VARIABLETYPE_INTEGER)&&GetValueInteger($source)===$raw&&
             $this->IsVariable($online,VARIABLETYPE_BOOLEAN)&&GetValueBoolean($online);
     }
 
@@ -395,6 +397,16 @@ trait JVWledWatchdogTrait
                 $this->WdOff($docs);
                 $this->SetStatusText($reason.' angefordert');
                 return;
+            }
+            if ($this->ReadAttributeInteger('WatchdogRetryCount')>0) {
+                $age=$this->WdNowMs()-$this->ReadAttributeInteger('WatchdogLeaseAtMs');
+                // Leave room for the bounded 700 ms POST even after a delayed timer.
+                if ($age<0 || $age>4200) {
+                    $this->AmpelTrace('Signal '.$signal.' – Nachprüfung zu spät für vorhandenen Watchdog; AUS');
+                    $this->WdOff($docs);
+                    $this->SetStatusText('Watchdog-Nachprüfung außerhalb des Zeitbudgets – AUS angefordert');
+                    return;
+                }
             }
             if ($this->ReadAttributeInteger('WatchdogRetryCount')>0 || time()-$this->ReadAttributeInteger('WatchdogLastSent')>=1) {
                 $req=[];

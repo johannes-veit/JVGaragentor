@@ -118,4 +118,8 @@ check(eta.textContent==='Endlage zur Referenz anfahren','Unreferenced moving pos
 
 check(html.includes('jvg-footer')&&html.includes('font-size:clamp(12px,13cqw,32px)'),'Footer bounded by position column');
 
+check(html.includes('@media(max-width:600px) and (orientation:portrait)'),'Compact portrait smartphone layout');
+check(html.includes('height:72vh;min-height:72vh;max-height:72vh;height:72dvh;min-height:72dvh;max-height:72dvh'),'Explicit mobile height cap with viewport fallback');
+check(html.includes('grid-template-rows:minmax(0,1fr) minmax(0,.37fr) minmax(0,1fr)'),'Original three-row button proportions preserved');
+check(html.includes('grid-template-columns:minmax(0,2.1fr) minmax(0,1fr)'),'Original column proportions preserved');
 console.log('PASS '+checks+' HTML/JS-Visualisierungstests');

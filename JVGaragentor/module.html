@@ -39,6 +39,9 @@
 #jvg-root .jvg-percent {font-size:clamp(12px,13cqw,32px);font-weight:500;line-height:1.15;font-variant-numeric:tabular-nums;white-space:nowrap}
 #jvg-root .jvg-eta {font-size:clamp(10px,8cqw,20px);line-height:1.15;overflow-wrap:normal;word-break:normal;font-variant-numeric:tabular-nums}
 #jvg-root .jvg-eta:empty {display:none}
+/* Smartphone: reserve space for the host app header, tile title and outer margins.
+   Explicit height also caps the grid if the host offers a taller container. */
+@media(max-width:600px) and (orientation:portrait){#jvg-root {height:72vh;min-height:72vh;max-height:72vh;height:72dvh;min-height:72dvh;max-height:72dvh}}
 @media(max-width:500px){#jvg-root {padding:3px}#jvg-root .jvg-grid {gap:7px}#jvg-root .jvg-label{font-size:clamp(13px,3.3vw,21px)}}
 </style>
 <div id="jvg-root">

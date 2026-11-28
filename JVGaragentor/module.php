@@ -537,6 +537,10 @@ class JVGaragentor extends IPSModuleStrict
             'effectUntil' => $deadline,
             'blinkPeriodMs' => min(4000, max(500, $this->ReadPropertyInteger('BlinkPeriodMs'))),
             'warning' => $diagnostic,
+            'transientWait' => $this->MotionEnabled() && !$requiredEndStopsMissing && $this->IsOnline() &&
+                !$this->ReadAttributeBoolean('NeedsStop') &&
+                ((float)$this->ReadAttributeString('MotionZeroSinceText')>0 ||
+                    $this->ReadAttributeInteger('MotionPendingUntil')>time()),
             'enabled' => $this->ReadPropertyBoolean('EnableControl'),
             'ready' => !$requiredEndStopsMissing && !$this->ReadAttributeBoolean('NeedsStop') &&
                 (!$this->MotionEnabled() || ($this->ReadAttributeBoolean('MotionFeedbackOK') &&

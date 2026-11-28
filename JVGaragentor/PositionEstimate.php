@@ -12,15 +12,17 @@ trait JVPositionEstimateTrait
         $this->RegisterPropertyInteger('TravelCloseSeconds',40);
         $this->RegisterAttributeInteger('EstimateAnchor',-1); // 0..100000 = 0..100%
         $this->RegisterAttributeInteger('EstimateAnchorMs',0);
-        $this->RegisterAttributeInteger('EstimateLastMs',0);
+        $this->RegisterAttributeInteger('EstimateLastMs',0); // legacy, retained for upgrade compatibility
+        $this->RegisterAttributeString('EstimateAnchorMsText','0');
         $this->RegisterAttributeInteger('EstimateDirection',0);
         $this->RegisterAttributeInteger('EstimateRemaining',-1);
         $this->RegisterAttributeString('EstimateMapping','');
     }
 
-    protected function EstimateNowMs(): int
+    protected function EstimateNowMs(): float
     {
-        return (int)floor(microtime(true)*1000);
+        // Unix milliseconds exceed PHP_INT_MAX on 32-bit SymBox systems.
+        return floor(microtime(true)*1000);
     }
 
     private function EstimateTravelSeconds(int $direction): int
@@ -33,7 +35,7 @@ trait JVPositionEstimateTrait
         if ($this->RegisterVariableInteger('PositionPercent','Torposition (%) – Schließgrad',[],4)) {
             $this->SetValue('PositionPercent',-1);
         }
-        $mapping=json_encode([$this->MotionEnabled(),$this->MotionIds(),
+        $mapping=json_encode(['portable-v2',$this->MotionEnabled(),$this->MotionIds(),
             $this->ReadPropertyInteger('OnlineVariable'),$this->EndVariableId('EndOpenVariable'),
             $this->EndVariableId('EndCloseVariable'),$this->EstimateTravelSeconds(1),
             $this->EstimateTravelSeconds(3)]) ?: '';
@@ -52,18 +54,23 @@ trait JVPositionEstimateTrait
 
     private function EstimateInvalidate(): void
     {
-        $this->WriteAttributeInteger('EstimateAnchor',-1);
-        $this->WriteAttributeInteger('EstimateAnchorMs',0);
-        $this->WriteAttributeInteger('EstimateLastMs',0);
-        $this->WriteAttributeInteger('EstimateDirection',0);
+        if ($this->ReadAttributeInteger('EstimateAnchor')!==-1) $this->WriteAttributeInteger('EstimateAnchor',-1);
+        if ($this->ReadAttributeString('EstimateAnchorMsText')!=='0') $this->WriteAttributeString('EstimateAnchorMsText','0');
+        if ($this->ReadAttributeInteger('EstimateDirection')!==0) $this->WriteAttributeInteger('EstimateDirection',0);
+        $this->SetBuffer('EstimateObservedMs','');
         $this->EstimatePublish(-1,-1);
     }
 
-    private function EstimateSetAnchor(int $position,int $now,int $direction): void
+    private function EstimateSetAnchor(int $position,float $now,int $direction): void
     {
-        $this->WriteAttributeInteger('EstimateAnchor',$position);
-        $this->WriteAttributeInteger('EstimateAnchorMs',$now);
-        $this->WriteAttributeInteger('EstimateDirection',$direction);
+        $oldPosition=$this->ReadAttributeInteger('EstimateAnchor');
+        $oldDirection=$this->ReadAttributeInteger('EstimateDirection');
+        // In a stable end position do not rewrite attributes or the status variable.
+        if ($position===$oldPosition && $direction===$oldDirection && $direction===0) return;
+        if ($oldPosition!==$position) $this->WriteAttributeInteger('EstimateAnchor',$position);
+        $stamp=sprintf('%.0f',$now);
+        if ($this->ReadAttributeString('EstimateAnchorMsText')!==$stamp) $this->WriteAttributeString('EstimateAnchorMsText',$stamp);
+        if ($oldDirection!==$direction) $this->WriteAttributeInteger('EstimateDirection',$direction);
     }
 
     /** The estimate is integrated from one absolute time anchor, never from rounded percent. */
@@ -74,16 +81,19 @@ trait JVPositionEstimateTrait
             return;
         }
         $now=$this->EstimateNowMs();
-        $last=$this->ReadAttributeInteger('EstimateLastMs');
-        // On restart, time adjustment or missed supervision, do not integrate an unknown gap.
-        if ($last>0 && ($now<$last || $now-$last>5000)) $this->EstimateInvalidate();
-        $this->WriteAttributeInteger('EstimateLastMs',$now);
+        $last=(float)$this->GetBuffer('EstimateObservedMs');
+        // Runtime-only observation heartbeat: no status variable or persistent attribute traffic.
+        // On restart, time adjustment or missed supervision, discard an unobserved gap.
+        if (($last<=0 && $this->ReadAttributeInteger('EstimateAnchor')>=0) ||
+            ($last>0 && ($now<$last || $now-$last>5000))) $this->EstimateInvalidate();
+        $this->SetBuffer('EstimateObservedMs',sprintf('%.0f',$now));
         $old=$this->ReadAttributeInteger('EstimateDirection');
         $anchor=$this->ReadAttributeInteger('EstimateAnchor');
-        $at=$this->ReadAttributeInteger('EstimateAnchorMs');
+        $at=(float)$this->ReadAttributeString('EstimateAnchorMsText');
         $position=$anchor;
         if ($anchor>=0 && in_array($old,[1,3],true)) {
-            $delta=(int)round(max(0,$now-$at)*100000/($this->EstimateTravelSeconds($old)*1000));
+            $duration=$this->EstimateTravelSeconds($old)*1000;
+            $delta=(int)round(min($duration,max(0,$now-$at))*100000/$duration);
             $position=min(100000,max(0,$anchor+($old===1?-$delta:$delta)));
         }
         // Physical target end switches take precedence even if the drive relay
@@ -99,7 +109,7 @@ trait JVPositionEstimateTrait
             (($motion===1&&$closed)||($motion===3&&$open))) {
             $position=$motion===1?100000:0;
         }
-        if ($motion!==$old || $anchor<0) $this->EstimateSetAnchor($position,$now,$motion);
+        if ($motion!==$old || ($anchor<0 && $position>=0)) $this->EstimateSetAnchor($position,$now,$motion);
         if ($position<0) {
             $this->EstimatePublish(-1,-1);
             return;

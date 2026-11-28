@@ -105,6 +105,17 @@ push(0,'GESTOPPT',0,{positionPercent:-1,positionRemaining:-1});
 check(percent.textContent==='– %'&&eta.textContent==='','Unknown position neutral');
 push(0,'GESTOPPT',0,{positionPercent:50,online:false});
 check(percent.textContent==='– %','Offline does not display stale position');
+push(1,'LÄUFT AUF',4,{positionPercent:65,positionRemaining:26,positionEstimateUntil:1});
+check(percent.textContent==='ca. 65 %'&&eta.textContent==='Offen in 26 s','Phone clock offset does not hide fresh estimate');
+push(1,'LÄUFT AUF',4,{positionPercent:65,positionRemaining:26,positionEstimateUntil:1,ready:false,transientWait:true});
+check(note.textContent===''&&buttons.find(b=>b.dataset.jvgCommand==='AUF').disabled&&!buttons.find(b=>b.dataset.jvgCommand==='STOP').disabled,'Transient wait has no false configuration warning, drive remains locked');
+push(0,'GESTOPPT',0,{ready:false,transientWait:false});
+check(note.textContent.includes('Konfiguration prüfen'),'Real configuration failure still visible');
+push(0,'GESTOPPT',0,{ready:false,transientWait:true,warning:'Rückmeldung ungültig'});
+check(note.textContent==='Rückmeldung ungültig','Explicit faults not suppressed');
+push(1,'LÄUFT AUF',4,{positionPercent:-1,positionRemaining:-1,positionEstimateUntil:1});
+check(eta.textContent==='Endlage zur Referenz anfahren','Unreferenced moving position explained');
+
 check(html.includes('jvg-footer')&&html.includes('font-size:clamp(12px,13cqw,32px)'),'Footer bounded by position column');
 
 console.log('PASS '+checks+' HTML/JS-Visualisierungstests');

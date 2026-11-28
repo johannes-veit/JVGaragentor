@@ -23,7 +23,8 @@ trait JVMotionFeedbackTrait
         $this->RegisterAttributeInteger('MotionPendingUntil', 0);
         $this->RegisterAttributeString('MotionSubscriptions', '[]');
         $this->RegisterAttributeString('MotionMapping', '');
-        $this->RegisterAttributeInteger('MotionZeroSinceMs', 0);
+        $this->RegisterAttributeInteger('MotionZeroSinceMs', 0); // legacy attribute retained
+        $this->RegisterAttributeString('MotionZeroSinceText', '0');
         $this->RegisterTimer('MotionSettle', 0, 'JVG_Monitor($_IPS["TARGET"]);');
     }
 
@@ -81,6 +82,7 @@ trait JVMotionFeedbackTrait
         foreach ($wanted as $id) $this->RegisterMessage($id, VM_UPDATE);
         $this->WriteAttributeString('MotionSubscriptions', json_encode($wanted) ?: '[]');
         $this->MotionClearZero();
+        $this->SetTimerInterval('MotionSettle',0);
         $mapping = json_encode([$this->MotionEnabled(), $this->MotionIds()]) ?: '';
         if ($mapping !== $this->ReadAttributeString('MotionMapping')) {
             $this->WriteAttributeString('MotionMapping', $mapping);
@@ -122,10 +124,10 @@ trait JVMotionFeedbackTrait
 
     private function MotionClearZero(): void
     {
-        if ($this->ReadAttributeInteger('MotionZeroSinceMs')!==0) {
-            $this->WriteAttributeInteger('MotionZeroSinceMs',0);
+        if ($this->ReadAttributeString('MotionZeroSinceText')!=='0') {
+            $this->WriteAttributeString('MotionZeroSinceText','0');
+            $this->SetTimerInterval('MotionSettle',0);
         }
-        $this->SetTimerInterval('MotionSettle',0);
     }
 
     private function MotionMonitor(): void
@@ -149,7 +151,7 @@ trait JVMotionFeedbackTrait
         $this->WriteAttributeBoolean('StateInitialized', true);
         $previous = (string)$this->GetValue('Position');
         if ($motion !== 0) {
-            if ($this->ReadAttributeInteger('MotionZeroSinceMs')>0) $this->SendDebug('Fahrtrichtung','Kurzer Aussetzer der Fahrmeldung beendet',0);
+            if ((float)$this->ReadAttributeString('MotionZeroSinceText')>0) $this->SendDebug('Fahrtrichtung','Kurzer Aussetzer der Fahrmeldung beendet',0);
             $this->MotionClearZero();
             $position = $motion === 1 ? self::OPENING : self::CLOSING;
             $this->WriteAttributeInteger('MotionPendingUntil', 0);
@@ -173,11 +175,11 @@ trait JVMotionFeedbackTrait
         // During the confirmation window no new driving command is allowed.
         $targetReached=($previous===self::OPENING && $open) || ($previous===self::CLOSING && $closed);
         if (!$initial && !$targetReached && in_array($previous,[self::OPENING,self::CLOSING],true)) {
-            $now=(int)floor(microtime(true)*1000);
-            $since=$this->ReadAttributeInteger('MotionZeroSinceMs');
+            $now=floor(microtime(true)*1000);
+            $since=(float)$this->ReadAttributeString('MotionZeroSinceText');
             if ($since<=0 || $now<$since) {
                 $since=$now;
-                $this->WriteAttributeInteger('MotionZeroSinceMs',$since);
+                $this->WriteAttributeString('MotionZeroSinceText',sprintf('%.0f',$since));
                 $this->SetTimerInterval('MotionSettle',200);
             }
             if ($now-$since<200) {

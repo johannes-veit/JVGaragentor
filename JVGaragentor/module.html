@@ -77,6 +77,7 @@
   const initial = __JV_INITIAL__;
   let ready = false;
   let latest = null;
+  let receivedAt = 0;
   let shownSignal = -1;
   const positionCard = root.querySelector('.jvg-position');
   const positionText = root.querySelector('.jvg-state');
@@ -100,17 +101,19 @@
     const p = latest.positionPercent;
     const remaining = latest.positionRemaining;
     const moving = latest.position === 'LÄUFT AUF' || latest.position === 'LÄUFT ZU';
-    const fresh = !moving || Date.now() < Number(latest.positionEstimateUntil || 0)*1000;
+    // Relative heartbeat avoids clock skew between SymBox and phone.
+    const fresh = !moving || (Number(latest.positionEstimateUntil || 0)>0 && Date.now()-receivedAt<4000);
     const valid = latest.online === true && fresh && Number.isInteger(p) && p >= 0 && p <= 100;
     percentText.textContent = valid ? ((p>0 && p<100 ? 'ca. ' : '') + p + ' %') : '– %';
     etaText.textContent = valid && moving && Number.isInteger(remaining) && remaining >= 0
       ? (remaining === 0 ? 'Endlage erwartet' : (latest.position === 'LÄUFT AUF' ? 'Offen in ' : 'Geschlossen in ') + remaining + ' s')
-      : '';
+      : (moving && fresh && latest.online===true && p===-1 ? 'Endlage zur Referenz anfahren' : '');
   }
   function show(s) {
     if (!s || typeof s !== 'object') return;
     const valid = ['AUF','ZU','LÄUFT AUF','LÄUFT ZU','GESTOPPT'];
     latest = s;
+    receivedAt = Date.now();
     const pos = valid.includes(s.position) ? s.position : 'GESTOPPT';
     const period = Number(s.blinkPeriodMs || 1600);
     positionCard.style.setProperty('--jvg-blink-ms', Math.min(4000, Math.max(500, period)) + 'ms');
@@ -122,7 +125,7 @@
     ready = s.enabled === true && s.online === true && s.ready === true;
     const canStop = s.enabled === true && s.online === true;
     const info = !s.enabled ? 'TESTMODUS – Befehle gesperrt' :
-      !s.online ? 'Shelly OFFLINE – Befehle gesperrt' : (s.warning || (!s.ready ? 'Konfiguration prüfen – Befehle gesperrt' : ''));
+      !s.online ? 'Shelly OFFLINE – Befehle gesperrt' : (s.warning || (!s.ready && s.transientWait !== true ? 'Konfiguration prüfen – Befehle gesperrt' : ''));
     root.querySelector('.jvg-note').textContent = info;
     buttons.forEach(b => { b.disabled = (b.dataset.jvgCommand === 'STOP') ? !canStop : !ready; });
   }

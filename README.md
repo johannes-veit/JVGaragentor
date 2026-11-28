@@ -1,3 +1,7 @@
+## v1.2.18 – Positionsanzeige auf SymBox und ruhiger Stillstand
+
+Unix-Millisekunden der Positionsschätzung und der kurzen Fahrtrichtungsbestätigung werden als portable Zeitstrings gespeichert, nicht als große Integer. Die laufende Beobachtung verwendet nur einen lokalen Laufzeitpuffer. Stabile Endlagen und Zwischenstopps erzeugen keine Positionsvariablen-Schreibvorgänge, persistenten Schätzattribute oder Kachel-Updates. Bei der Migration wird der Positionsanker neu an einer physischen Endlage referenziert. Kurze reguläre Befehlsverriegelungen werden nicht als Konfigurationsfehler dargestellt; echte Fehler und Sperren bleiben wirksam. Die Kachel nutzt eine relative Empfangsfrist, unabhängig von der Uhrzeit des Smartphones. Keine Änderung der WLED-Ampel, LCN-Zuordnung, Relais-IDs oder Zeitvorgaben.
+
 ## v1.2.17 – Torposition und Restfahrzeit
 
 Neue Integer-Variable PositionPercent (Torposition (%) – Schließgrad), 0 = AUF, 100 = ZU, -1 = unbekannt. Referenzfahrzeiten AUF 39 s und ZU 40 s, beide im Formular änderbar. Lineare zeitbasierte Schätzung anhand tatsächlicher Fahrmeldungen, millisekundengenaue Integration; STOPP und Richtungswechsel erhalten die aktuelle Position, Endlagen kalibrieren, Ausfall/Beobachtungslücke invalidiert. Restzeit auf volle Sekunden aufgerundet, keine Schätzung als echte Endlage. Ergänzung nur im unteren Positionsfeld, keine Änderung der Tasten, Ampel oder WLED. Keine neue Konfiguration nötig. Die Schätzung berücksichtigt keine ungemessenen Sanftlauf-Geschwindigkeiten und ist keine Wegmessung.

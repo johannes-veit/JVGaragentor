@@ -107,7 +107,10 @@ class IPSModuleStrict {
         return $new;
     }
     public function GetValue(string $name): mixed {return $this->values[$name];}
-    public function SetValue(string $name,mixed $v): void {$this->values[$name]=$v;}
+    public array $valueWrites=[], $buffers=[];
+    public function SetValue(string $name,mixed $v): void {$this->valueWrites[]=[$name,$v];$this->values[$name]=$v;}
+    public function SetBuffer(string $name,string $value): void {$this->buffers[$name]=$value;}
+    public function GetBuffer(string $name): string {return $this->buffers[$name]??'';}
     public function RegisterTimer(string $name,int $time,string $callback): void {}
     public array $timerChanges=[];
     public function SetTimerInterval(string $name,int $time): void {$this->timerChanges[]=[$name,$time];}
@@ -750,7 +753,7 @@ check($m->values['Signal']===1,'STOP command not mistaken for actual standstill'
 $GLOBALS['simVars'][28550]['value']=true;
 $m->feedback(false,false);$m->event(36019);
 check($m->values['Signal']===1 && !$m->attrs['MotionFeedbackOK'],'Short all-off transition retains moving indication but blocks driving');
-$m->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$m->Monitor();
+$m->attrs['MotionZeroSinceText']=sprintf('%.0f',microtime(true)*1000-250);$m->Monitor();
 check($m->values['Position']==='GESTOPPT' && $m->values['Signal']===0,'Actual intermediate stop');
 $m->attrs['LCNLastDispatch']='{}';
 check($m->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[11571,true],'C2 short at standstill sends close');
@@ -802,7 +805,7 @@ unset($GLOBALS['simVars'][36019]);$m->Monitor();
 check(!$m->attrs['MotionFeedbackOK'],'Missing variable is not standstill');
 mkVar(36019,VARIABLETYPE_BOOLEAN,false,false);
 $m->ApplyChanges();
-$m->feedback(false,false);$m->event(36019);$m->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$m->Monitor();$m->attrs['LCNLastDispatch']='{}';
+$m->feedback(false,false);$m->event(36019);$m->attrs['MotionZeroSinceText']=sprintf('%.0f',microtime(true)*1000-250);$m->Monitor();$m->attrs['LCNLastDispatch']='{}';
 $GLOBALS['simVars'][28550]['value']=false;
 $before=count($GLOBALS['simActions']);
 check(!$m->Command('AUF') && count($GLOBALS['simActions'])===$before,'No drive while STOP contact open');
@@ -846,7 +849,7 @@ $GLOBALS['simVars'][53400]['value']=false;$m->event(53400);publishMotionSignal($
 check(!$motionAmpel->docs['front']['state']['on']&&!$motionAmpel->docs['rear']['state']['on'],'Feedback loss disables both WLED controllers');
 $m->feedback(true,false);$m->event(36019);publishMotionSignal($m,$motionAmpel);
 checkMotionScene($motionAmpel,[255,160,0,0],true,'Feedback recovered');
-$m->feedback(false,false);$m->event(36019);$m->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$m->Monitor();publishMotionSignal($m,$motionAmpel);
+$m->feedback(false,false);$m->event(36019);$m->attrs['MotionZeroSinceText']=sprintf('%.0f',microtime(true)*1000-250);$m->Monitor();publishMotionSignal($m,$motionAmpel);
 check(!$motionAmpel->docs['front']['state']['on']&&!$motionAmpel->docs['rear']['state']['on'],'Confirmed intermediate stop disables both WLED');
 
 
@@ -896,7 +899,7 @@ check(!$upgrade->RelayMigrationReady() && count($GLOBALS['simActions'])===0,'Aft
 check($upgrade->Command('AUF') && end($GLOBALS['simActions'])===[23120,true],'New O1 used');
 $GLOBALS['simVars'][23120]['value']=false;$GLOBALS['simVars'][36019]['value']=true;$upgrade->Monitor();
 check($upgrade->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[28550,false],'New O3 used for actual motion STOP');
-$GLOBALS['simVars'][28550]['value']=true;$GLOBALS['simVars'][36019]['value']=false;$GLOBALS['simVars'][21923]['value']=false;$upgrade->Monitor();$upgrade->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$upgrade->Monitor();$upgrade->attrs['LCNLastDispatch']='{}';
+$GLOBALS['simVars'][28550]['value']=true;$GLOBALS['simVars'][36019]['value']=false;$GLOBALS['simVars'][21923]['value']=false;$upgrade->Monitor();$upgrade->attrs['MotionZeroSinceText']=sprintf('%.0f',microtime(true)*1000-250);$upgrade->Monitor();$upgrade->attrs['LCNLastDispatch']='{}';
 check($upgrade->ProcessLCNInput(35739,'034002') && end($GLOBALS['simActions'])===[11571,true],'New O2 used at standstill');
 
 
@@ -999,10 +1002,10 @@ check(!in_array(['MotionSettle',200],$dip->timerChanges,true),'Duplicate all-off
 check($dip->values['Signal']===1 && !$dip->attrs['MotionFeedbackOK'],'Transient all-off cannot send close');
 check(!$dip->Command('ZU')&&count($GLOBALS['simActions'])===0,'During confirmation driving is blocked');
 $dip->feedback(true,false);$dip->event(36019);
-check($dip->values['Signal']===1&&$dip->attrs['MotionFeedbackOK']&&$dip->attrs['MotionZeroSinceMs']===0,'Short interruption recovered without signal restart');
+check($dip->values['Signal']===1&&$dip->attrs['MotionFeedbackOK']&&$dip->attrs['MotionZeroSinceText']==='0','Short interruption recovered without signal restart');
 $dip->feedback(false,false);$dip->event(36019);
 check($dip->ProcessLCNInput(35739,'034002')&&end($GLOBALS['simActions'])===[28550,false],'GT2 short during ambiguous stop sends STOP');
-$dip->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$dip->Monitor();
+$dip->attrs['MotionZeroSinceText']=sprintf('%.0f',microtime(true)*1000-250);$dip->Monitor();
 check($dip->values['Signal']===0,'Confirmed intermediate stop switches off');
 $dip->feedback(true,false);$dip->event(36019);$dip->feedback(false,false);$GLOBALS['simVars'][13220]['value']=true;$dip->event(13220);
 check($dip->values['Signal']===2,'Target end without confirmation delay');
@@ -1052,7 +1055,7 @@ check($fast->requests===[],'No duplicate traffic once pending color is handled')
 // Position estimator: exact elapsed time, stop/resume/reversal, calibration and loss.
 class EstimateTestGate extends MotionTestGate {
     public int $clock=1800000000000;
-    protected function EstimateNowMs(): int {return $this->clock;}
+    protected function EstimateNowMs(): float {return (float)$this->clock;}
     public function advance(int $ms): void {$this->clock+=$ms;}
 }
 resetHardware();
@@ -1064,15 +1067,27 @@ mkVar(35739,VARIABLETYPE_STRING,'034002',false);
 $est=new EstimateTestGate();$est->InstanceID=15957;$est->Create();$est->props['EnableControl']=true;$est->ApplyChanges();
 check($est->props['TravelOpenSeconds']===39 && $est->props['TravelCloseSeconds']===40,'Reference times prefilled 39/40');
 check($est->values['PositionPercent']===100,'Closed calibration 100');
+$est->valueWrites=[];$est->sent=[];$idleAttributes=$est->attrs;
+for($i=0;$i<12;$i++) {$est->advance(1000);$est->Monitor();}
+check($est->valueWrites===[] && $est->sent===[],'Closed idle: no variable writes or visualization messages');
+check($est->attrs===$idleAttributes,'Closed idle: no persistent attribute churn');
+
 $est->feedback(true,false);$est->event(36019);
 check($est->attrs['EstimateRemaining']===39 && $est->values['PositionPercent']===100,'Opening ETA immediately 39 and confirmed starting end 100');
+check((float)$est->attrs['EstimateAnchorMsText']>2147483647 && is_string($est->attrs['EstimateAnchorMsText']) &&
+    $est->attrs['EstimateAnchorMs']===0 && $est->attrs['EstimateLastMs']===0,'Timestamp portable on 32-bit systems, no legacy ms writes');
+
 $GLOBALS['simVars'][21923]['value']=false;
 for($i=0;$i<13;$i++) {$est->advance(1000);$est->Monitor();}
 check($est->values['PositionPercent']===67 && $est->attrs['EstimateRemaining']===26,'Opening after 13 s 67% and 26s');
 $est->feedback(false,false);$est->event(36019);
-$est->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$est->Monitor();
+$est->attrs['MotionZeroSinceText']=sprintf('%.0f',microtime(true)*1000-250);$est->Monitor();
 for($i=0;$i<5;$i++) {$est->advance(1000);$est->Monitor();}
 check($est->values['PositionPercent']===67&&$est->attrs['EstimateRemaining']===-1,'Stop freezes position and clears ETA');
+$est->valueWrites=[];$est->sent=[];$idleAttributes=$est->attrs;
+for($i=0;$i<20;$i++) {$est->advance(1000);$est->Monitor();}
+check($est->valueWrites===[]&&$est->sent===[]&&$est->attrs===$idleAttributes,'Intermediate standstill: no value writes, persistent attribute changes or broadcasts');
+
 $est->feedback(false,true);$est->event(41452);
 check($est->attrs['EstimateRemaining']===14,'Reversal uses closing reference, rounded upward');
 for($i=0;$i<4;$i++) {$est->advance(1000);$est->Monitor();}
@@ -1105,8 +1120,17 @@ $est->feedback(false,true);$est->event(41452);
 check($est->attrs['EstimateRemaining']===50,'Edited travel time used immediately after calibration');
 $est->advance(1000);$est->Monitor();
 $est->feedback(false,false);$est->event(41452);$GLOBALS['simVars'][13220]['value']=false;
-$est->attrs['MotionZeroSinceMs']=(int)(microtime(true)*1000)-250;$est->Monitor();
+$est->attrs['MotionZeroSinceText']=sprintf('%.0f',microtime(true)*1000-250);$est->Monitor();
 $before=$est->values['PositionPercent'];$est->ApplyChanges();
 check($est->values['PositionPercent']===$before,'Reapply with same mapping and observed stop preserves estimate');
+$est->buffers=[];$est->Monitor();
+check($est->values['PositionPercent']===-1,'Lost runtime heartbeat: no invented intermediate position');
+$GLOBALS['simVars'][21923]['value']=true;$est->event(21923);
+check($est->values['PositionPercent']===100,'Physical end restores estimate after restart');
+$est->feedback(true,false);$est->event(36019);$GLOBALS['simVars'][21923]['value']=false;
+$est->advance(1000);$est->Monitor();$est->feedback(false,false);$est->event(36019);
+$snap=json_decode(end($est->sent),true);
+check($snap['transientWait']===true&&$snap['ready']===false,'Temporary hold is identified without unlocking movement');
+
 
 echo "PASS $cnt Prüfungen, Testsimulation ohne echte Tor-/WLED-Hardware.\n";
